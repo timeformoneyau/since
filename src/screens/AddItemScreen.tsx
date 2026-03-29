@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { v4 as uuidv4 } from 'uuid';
 import { RootStackParamList, RepeatUnit, DEFAULT_CATEGORIES } from '../types';
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 import { addItem } from '../storage/items';
 import { todayString, formatDisplay, parseDate } from '../utils/dateUtils';
 import { scheduleItemNotifications } from '../notifications/scheduler';
@@ -69,7 +72,7 @@ export default function AddItemScreen() {
     const ru = rv && rv > 0 ? repeatUnit : null;
 
     const item = {
-      id: uuidv4(),
+      id: generateId(),
       name: trimmed,
       category,
       lastDoneDate,
