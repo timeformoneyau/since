@@ -6,17 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, RepeatUnit, DEFAULT_CATEGORIES } from '../types';
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
+import { RootStackParamList, RepeatUnit } from '../types';
 import { addItem } from '../storage/items';
 import { todayString, formatDisplay, parseDate } from '../utils/dateUtils';
 import { scheduleItemNotifications } from '../notifications/scheduler';
@@ -29,6 +24,10 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Add'>;
 
 const REPEAT_UNITS: RepeatUnit[] = ['days', 'weeks', 'months', 'years'];
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
 export default function AddItemScreen() {
   const navigation = useNavigation<Nav>();
   const nameRef = useRef<TextInput>(null);
@@ -40,21 +39,17 @@ export default function AddItemScreen() {
   const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>('months');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-
-  // Suggestion state
   const [suggestion, setSuggestion] = useState<{ repeatValue: number; repeatUnit: RepeatUnit } | null>(null);
   const [suggestionApplied, setSuggestionApplied] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => nameRef.current?.focus(), 100);
+    const timer = setTimeout(() => nameRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    const s = getSuggestion(name);
-    setSuggestion(s);
-    if (s && !suggestionApplied) {
-      // Only auto-fill if repeat fields are still blank
-    }
+    setSuggestion(getSuggestion(name));
+    setSuggestionApplied(false);
   }, [name]);
 
   function applySuggestion() {
@@ -69,15 +64,15 @@ export default function AddItemScreen() {
     if (!trimmed) return;
 
     const rv = repeatValue ? parseInt(repeatValue, 10) : null;
-    const ru = rv && rv > 0 ? repeatUnit : null;
+    const hasRepeat = rv !== null && rv > 0;
 
     const item = {
       id: generateId(),
       name: trimmed,
       category,
       lastDoneDate,
-      repeatValue: rv && rv > 0 ? rv : null,
-      repeatUnit: ru,
+      repeatValue: hasRepeat ? rv : null,
+      repeatUnit: hasRepeat ? repeatUnit : null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -107,7 +102,7 @@ export default function AddItemScreen() {
             placeholder="What have you done?"
             placeholderTextColor={colours.textMuted}
             value={name}
-            onChangeText={(t) => { setName(t); setSuggestionApplied(false); }}
+            onChangeText={setName}
             autoCapitalize="sentences"
             returnKeyType="done"
           />
@@ -150,37 +145,27 @@ export default function AddItemScreen() {
         {/* Repeat every */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Repeat every</Text>
-          <View style={styles.repeatRow}>
-            <TextInput
-              style={styles.repeatInput}
-              placeholder="—"
-              placeholderTextColor={colours.textMuted}
-              value={repeatValue}
-              onChangeText={(t) => setRepeatValue(t.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              maxLength={4}
-            />
-            <View style={styles.unitRow}>
-              {REPEAT_UNITS.map((u) => (
-                <TouchableOpacity
-                  key={u}
-                  style={[
-                    styles.unitBtn,
-                    repeatUnit === u && styles.unitBtnActive,
-                  ]}
-                  onPress={() => setRepeatUnit(u)}
-                >
-                  <Text
-                    style={[
-                      styles.unitBtnText,
-                      repeatUnit === u && styles.unitBtnTextActive,
-                    ]}
-                  >
-                    {u}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <TextInput
+            style={styles.repeatInput}
+            placeholder="—"
+            placeholderTextColor={colours.textMuted}
+            value={repeatValue}
+            onChangeText={(t) => setRepeatValue(t.replace(/[^0-9]/g, ''))}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+          <View style={styles.unitRow}>
+            {REPEAT_UNITS.map((u) => (
+              <TouchableOpacity
+                key={u}
+                style={[styles.unitBtn, repeatUnit === u && styles.unitBtnActive]}
+                onPress={() => setRepeatUnit(u)}
+              >
+                <Text style={[styles.unitBtnText, repeatUnit === u && styles.unitBtnTextActive]}>
+                  {u}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -214,16 +199,9 @@ export default function AddItemScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 60,
-  },
-  field: {
-    marginBottom: 8,
-  },
+  container: { flex: 1 },
+  content: { padding: 20, paddingBottom: 60 },
+  field: { marginBottom: 8 },
   nameInput: {
     fontSize: 24,
     fontWeight: '600',
@@ -246,18 +224,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0D9B0',
   },
-  suggestionText: {
-    fontSize: 13,
-    color: '#7A5C2A',
-  },
-  suggestionApply: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#C8842A',
-  },
-  fieldGroup: {
-    marginBottom: 20,
-  },
+  suggestionText: { fontSize: 13, color: '#7A5C2A' },
+  suggestionApply: { fontSize: 13, fontWeight: '600', color: '#C8842A' },
+  fieldGroup: { marginBottom: 20 },
   label: {
     fontSize: 11,
     fontWeight: '600',
@@ -274,13 +243,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colours.border,
   },
-  rowButtonText: {
-    fontSize: 15,
-    color: colours.textPrimary,
-  },
-  repeatRow: {
-    gap: 10,
-  },
+  rowButtonText: { fontSize: 15, color: colours.textPrimary },
   repeatInput: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -290,12 +253,9 @@ const styles = StyleSheet.create({
     borderColor: colours.border,
     fontSize: 15,
     color: colours.textPrimary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  unitRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  unitRow: { flexDirection: 'row', marginTop: 2 },
   unitBtn: {
     flex: 1,
     paddingVertical: 9,
@@ -304,19 +264,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colours.border,
     backgroundColor: colours.surface,
+    marginRight: 6,
   },
-  unitBtnActive: {
-    backgroundColor: colours.textPrimary,
-    borderColor: colours.textPrimary,
-  },
-  unitBtnText: {
-    fontSize: 13,
-    color: colours.textSecondary,
-  },
-  unitBtnTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  unitBtnActive: { backgroundColor: colours.textPrimary, borderColor: colours.textPrimary },
+  unitBtnText: { fontSize: 13, color: colours.textSecondary },
+  unitBtnTextActive: { color: '#fff', fontWeight: '600' },
   saveBtn: {
     backgroundColor: colours.textPrimary,
     paddingVertical: 15,
@@ -324,12 +276,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
-  saveBtnDisabled: {
-    opacity: 0.35,
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  saveBtnDisabled: { opacity: 0.35 },
+  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });

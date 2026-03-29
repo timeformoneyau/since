@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     borderColor: colours.border,
   },
   rowButtonText: { fontSize: 15, color: colours.textPrimary },
-  repeatRow: { gap: 10 },
+  repeatRow: { marginBottom: 8 },
   repeatInput: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     color: colours.textPrimary,
     marginBottom: 6,
   },
-  unitRow: { flexDirection: 'row', gap: 8 },
+  unitRow: { flexDirection: 'row' },
   unitBtn: {
     flex: 1,
     paddingVertical: 9,
@@ -274,6 +274,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colours.border,
     backgroundColor: colours.surface,
+    marginRight: 6,
   },
   unitBtnActive: { backgroundColor: colours.textPrimary, borderColor: colours.textPrimary },
   unitBtnText: { fontSize: 13, color: colours.textSecondary },

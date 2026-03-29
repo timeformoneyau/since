@@ -8,7 +8,7 @@ import {
   Animated,
   PanResponder,
 } from 'react-native';
-import { SinceItem, StatusLabel } from '../types';
+import { SinceItem } from '../types';
 import { computeItemStatus, secondaryLine } from '../utils/statusUtils';
 import { colours, statusColour } from './colours';
 
@@ -124,7 +124,7 @@ export default function ItemCard({ item, onMarkDone, onEdit, onDelete }: Props) 
             {label !== null ? (
               <>
                 <Text style={[styles.statusLabel, { color: accent }]}>{label}</Text>
-                <Text style={styles.secondaryText}>{secondary}</Text>
+                <Text style={[styles.secondaryText, { marginLeft: 6 }]}>{secondary}</Text>
               </>
             ) : (
               <Text style={styles.secondaryText}>Tracked only</Text>
@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   statusLabel: {
     fontSize: 12,
