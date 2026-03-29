@@ -1,24 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { SinceItem } from '../types';
-import {
-  getNextDueDate,
-  intervalToDays,
-  comingUpThreshold,
-  parseDate,
-} from '../utils/dateUtils';
+import { getNextDueDate, intervalToDays, comingUpThreshold } from '../utils/dateUtils';
 import { addDays } from 'date-fns';
 
 const PREFIX = 'since_';
-
-// Configure how notifications appear when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === 'android') {
@@ -63,39 +49,30 @@ export async function scheduleItemNotifications(item: SinceItem): Promise<void> 
   const approxInterval = intervalToDays(item.repeatValue, item.repeatUnit);
   const threshold = comingUpThreshold(approxInterval);
 
-  const notifAt = (date: Date): Date => {
+  const at9am = (date: Date): Date => {
     const d = new Date(date);
     d.setHours(9, 0, 0, 0);
     return d;
   };
 
-  const schedule = async (
-    suffix: string,
-    body: string,
-    triggerDate: Date,
-  ) => {
+  const schedule = async (suffix: string, body: string, triggerDate: Date) => {
     if (triggerDate <= now) return;
     await Notifications.scheduleNotificationAsync({
       identifier: `${PREFIX}${item.id}_${suffix}`,
       content: { title: 'Since', body },
-      trigger: { date: triggerDate, type: Notifications.SchedulableTriggerInputTypes.DATE },
+      trigger: { seconds: Math.floor((triggerDate.getTime() - now.getTime()) / 1000) },
     });
   };
 
-  // 1. Coming up
-  const comingUpDate = notifAt(addDays(nextDue, -threshold));
   await schedule(
     'coming_up',
     `${item.name} due in ${threshold} day${threshold !== 1 ? 's' : ''}`,
-    comingUpDate,
+    at9am(addDays(nextDue, -threshold)),
   );
 
-  // 2. Due today
-  await schedule('due', `${item.name} due today`, notifAt(nextDue));
+  await schedule('due', `${item.name} due today`, at9am(nextDue));
 
-  // 3. 7 days overdue
-  const overdueDate = notifAt(addDays(nextDue, 7));
-  await schedule('overdue_7', `${item.name} overdue by 7 days`, overdueDate);
+  await schedule('overdue_7', `${item.name} overdue by 7 days`, at9am(addDays(nextDue, 7)));
 }
 
 export async function rescheduleAllItems(items: SinceItem[]): Promise<void> {
