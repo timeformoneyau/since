@@ -1,91 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
+import { RootStackParamList } from './src/types';
+import { colours } from './src/components/colours';
+import MainListScreen from './src/screens/MainListScreen';
+import AddItemScreen from './src/screens/AddItemScreen';
+import EditItemScreen from './src/screens/EditItemScreen';
+import { requestNotificationPermissions } from './src/notifications/scheduler';
 
-// Catch any import-time errors
-let importError: string | null = null;
-let NavigationContainer: any = null;
-let SafeAreaProvider: any = null;
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
-try {
-  NavigationContainer = require('@react-navigation/native').NavigationContainer;
-} catch (e: any) {
-  importError = 'NavigationContainer failed: ' + e.message;
-}
-
-try {
-  SafeAreaProvider = require('react-native-safe-area-context').SafeAreaProvider;
-} catch (e: any) {
-  importError = (importError ?? '') + '\nSafeAreaProvider failed: ' + e.message;
-}
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const [error, setError] = useState<string | null>(importError);
-  const [log, setLog] = useState<string[]>(['App mounted']);
-
   useEffect(() => {
-    const msgs: string[] = [];
-    try {
-      require('./src/types');
-      msgs.push('✓ types');
-    } catch (e: any) { msgs.push('✗ types: ' + e.message); }
-
-    try {
-      require('./src/storage/items');
-      msgs.push('✓ storage');
-    } catch (e: any) { msgs.push('✗ storage: ' + e.message); }
-
-    try {
-      require('./src/utils/dateUtils');
-      msgs.push('✓ dateUtils');
-    } catch (e: any) { msgs.push('✗ dateUtils: ' + e.message); }
-
-    try {
-      require('./src/utils/statusUtils');
-      msgs.push('✓ statusUtils');
-    } catch (e: any) { msgs.push('✗ statusUtils: ' + e.message); }
-
-    try {
-      require('./src/notifications/scheduler');
-      msgs.push('✓ scheduler');
-    } catch (e: any) { msgs.push('✗ scheduler: ' + e.message); }
-
-    try {
-      require('./src/screens/MainListScreen');
-      msgs.push('✓ MainListScreen');
-    } catch (e: any) { msgs.push('✗ MainListScreen: ' + e.message); }
-
-    try {
-      require('./src/screens/AddItemScreen');
-      msgs.push('✓ AddItemScreen');
-    } catch (e: any) { msgs.push('✗ AddItemScreen: ' + e.message); }
-
-    try {
-      require('./src/screens/EditItemScreen');
-      msgs.push('✓ EditItemScreen');
-    } catch (e: any) { msgs.push('✗ EditItemScreen: ' + e.message); }
-
-    setLog(msgs);
+    requestNotificationPermissions();
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Since — Diagnostics</Text>
-      {error && <Text style={styles.error}>{error}</Text>}
-      <ScrollView>
-        {log.map((line, i) => (
-          <Text key={i} style={line.startsWith('✓') ? styles.ok : styles.fail}>
-            {line}
-          </Text>
-        ))}
-      </ScrollView>
-    </View>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: colours.background },
+            headerShadowVisible: false,
+            headerTintColor: colours.textPrimary,
+            headerBackTitle: 'Back',
+            contentStyle: { backgroundColor: colours.background },
+            headerTitleStyle: { fontWeight: '600', fontSize: 17 },
+          }}
+        >
+          <Stack.Screen name="Main" component={MainListScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Add" component={AddItemScreen} options={{ title: 'Track something' }} />
+          <Stack.Screen name="Edit" component={EditItemScreen} options={{ title: 'Edit' }} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 32, paddingTop: 60, backgroundColor: '#fff' },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 20 },
-  error: { color: 'red', marginBottom: 12 },
-  ok: { fontSize: 14, color: 'green', marginBottom: 4 },
-  fail: { fontSize: 14, color: 'red', marginBottom: 4 },
-});
