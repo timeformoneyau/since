@@ -57,11 +57,15 @@ export async function scheduleItemNotifications(item: SinceItem): Promise<void> 
 
   const schedule = async (suffix: string, body: string, triggerDate: Date) => {
     if (triggerDate <= now) return;
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${PREFIX}${item.id}_${suffix}`,
-      content: { title: 'Since', body },
-      trigger: { seconds: Math.floor((triggerDate.getTime() - now.getTime()) / 1000) },
-    });
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${PREFIX}${item.id}_${suffix}`,
+        content: { title: 'Since', body },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
+      });
+    } catch {
+      // Notification scheduling is non-critical — silently skip on error
+    }
   };
 
   await schedule(
