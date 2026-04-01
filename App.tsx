@@ -9,7 +9,7 @@ import MainListScreen from './src/screens/MainListScreen';
 import AddItemScreen from './src/screens/AddItemScreen';
 import EditItemScreen from './src/screens/EditItemScreen';
 import { requestNotificationPermissions, rescheduleAllNotifications } from './src/notifications/scheduler';
-import { loadItems } from './src/storage/items';
+import { loadItems } from './src/domain/items/storage';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
