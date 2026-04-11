@@ -12,7 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SinceItem, RootStackParamList } from '../types';
 import { DerivedItem } from '../domain/items/types';
-import { getDerivedItems, markItemDone, deleteItem } from '../domain/items/service';
+import { getDerivedItems, markItemDone } from '../domain/items/service';
 import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
@@ -41,11 +41,6 @@ export default function MainListScreen() {
 
   async function handleMarkDone(item: SinceItem) {
     await markItemDone(item.id);
-    refresh();
-  }
-
-  async function handleDelete(item: SinceItem) {
-    await deleteItem(item.id);
     refresh();
   }
 
@@ -112,7 +107,6 @@ export default function MainListScreen() {
             item={item}
             onMarkDone={handleMarkDone}
             onEdit={handleEdit}
-            onDelete={handleDelete}
           />
         )}
         contentContainerStyle={styles.list}
