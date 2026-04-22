@@ -1,10 +1,16 @@
 export type RepeatUnit = 'days' | 'weeks' | 'months' | 'years';
 
+export interface CompletionEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+}
+
 export interface SinceItem {
   id: string;
   name: string;
   category: string;
-  lastDoneDate: string; // ISO date string (YYYY-MM-DD)
+  lastDoneDate: string; // always mirrors history[0].date (most recent completion)
+  history: CompletionEvent[]; // newest first
   repeatValue: number | null;
   repeatUnit: RepeatUnit | null;
   createdAt: string;
@@ -40,4 +46,5 @@ export type RootStackParamList = {
   Main: undefined;
   Add: undefined;
   Edit: { itemId: string };
+  Detail: { itemId: string };
 };

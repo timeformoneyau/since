@@ -1,4 +1,4 @@
-import { SinceItem } from '../../types';
+import { SinceItem, CompletionEvent } from '../../types';
 
 export const STORAGE_VERSION = 1;
 
@@ -7,7 +7,7 @@ interface StorageEnvelope {
   items: unknown[];
 }
 
-function isValidItem(x: unknown): x is SinceItem {
+function isRawItem(x: unknown): x is Record<string, unknown> {
   if (!x || typeof x !== 'object') return false;
   const obj = x as Record<string, unknown>;
   return (
@@ -21,13 +21,32 @@ function isValidItem(x: unknown): x is SinceItem {
 }
 
 /**
- * Parse raw JSON from AsyncStorage into a validated SinceItem array.
+ * Add default fields introduced in later versions so old stored items
+ * always satisfy the current SinceItem shape.
+ */
+function hydrate(raw: Record<string, unknown>): SinceItem {
+  const item = raw as SinceItem;
+
+  // history was added after v0 — seed from lastDoneDate so users see at least one entry
+  if (!Array.isArray(item.history)) {
+    const seed: CompletionEvent = {
+      id: `${item.id}_seed`,
+      date: item.lastDoneDate,
+    };
+    return { ...item, history: [seed] };
+  }
+
+  return item;
+}
+
+/**
+ * Parse raw JSON from AsyncStorage into a validated, hydrated SinceItem array.
  *
  * Handles two formats:
- *   - Legacy: bare array (written by the original storage.ts before versioning)
+ *   - Legacy: bare array (written before versioning)
  *   - Current: { version: number; items: SinceItem[] } envelope
  *
- * Any item that fails validation is silently dropped rather than crashing.
+ * Items that fail validation are silently dropped rather than crashing.
  * Future schema migrations can be added here as version numbers increase.
  */
 export function parseAndMigrate(raw: string): SinceItem[] {
@@ -56,7 +75,7 @@ export function parseAndMigrate(raw: string): SinceItem[] {
     return [];
   }
 
-  return candidates.filter(isValidItem);
+  return candidates.filter(isRawItem).map(hydrate);
 }
 
 export function toEnvelope(items: SinceItem[]): string {

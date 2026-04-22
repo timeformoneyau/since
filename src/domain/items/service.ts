@@ -5,7 +5,7 @@
  * All persistence and notification coordination lives here.
  */
 
-import { SinceItem } from '../../types';
+import { SinceItem, CompletionEvent } from '../../types';
 import { CreateItemInput, UpdateItemInput, DerivedItem } from './types';
 import { loadItems, saveItems } from './storage';
 import { deriveItem } from './derive';
@@ -33,14 +33,16 @@ export async function getDerivedItemById(itemId: string): Promise<DerivedItem | 
   return item ? deriveItem(item) : null;
 }
 
-/** Create a new item, persist it, and schedule its notifications. */
+/** Create a new item with an initial history entry, persist it, and schedule notifications. */
 export async function createItem(input: CreateItemInput): Promise<DerivedItem> {
   const now = new Date().toISOString();
+  const initialEvent: CompletionEvent = { id: generateId(), date: input.lastDoneDate };
   const item: SinceItem = {
     id: generateId(),
     name: input.name,
     category: input.category,
     lastDoneDate: input.lastDoneDate,
+    history: [initialEvent],
     repeatValue: input.repeatValue,
     repeatUnit: input.repeatUnit,
     createdAt: now,
@@ -52,7 +54,10 @@ export async function createItem(input: CreateItemInput): Promise<DerivedItem> {
   return deriveItem(item);
 }
 
-/** Update fields on an existing item, persist, and reschedule its notifications. */
+/**
+ * Update metadata fields (name, category, lastDoneDate, repeat) on an item.
+ * Does NOT add a history entry — use markItemDone for completions.
+ */
 export async function updateItem(itemId: string, updates: UpdateItemInput): Promise<DerivedItem> {
   const items = await loadItems();
   const existing = items.find((i) => i.id === itemId);
@@ -62,6 +67,7 @@ export async function updateItem(itemId: string, updates: UpdateItemInput): Prom
     ...existing,
     ...updates,
     id: existing.id,
+    history: existing.history,
     createdAt: existing.createdAt,
     updatedAt: new Date().toISOString(),
   };
@@ -71,9 +77,27 @@ export async function updateItem(itemId: string, updates: UpdateItemInput): Prom
   return deriveItem(updated);
 }
 
-/** Mark an item as done today (or on a specific date). */
+/**
+ * Record a completion event. Prepends to history and updates lastDoneDate.
+ * This is the only path that grows the history log.
+ */
 export async function markItemDone(itemId: string, doneDate?: string): Promise<DerivedItem> {
-  return updateItem(itemId, { lastDoneDate: doneDate ?? todayString() });
+  const date = doneDate ?? todayString();
+  const items = await loadItems();
+  const existing = items.find((i) => i.id === itemId);
+  if (!existing) throw new Error(`Item not found: ${itemId}`);
+
+  const event: CompletionEvent = { id: generateId(), date };
+  const updated: SinceItem = {
+    ...existing,
+    lastDoneDate: date,
+    history: [event, ...existing.history],
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveItems(items.map((i) => (i.id === itemId ? updated : i)));
+  await scheduleItemNotifications(updated);
+  return deriveItem(updated);
 }
 
 /**

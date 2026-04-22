@@ -14,9 +14,10 @@ interface Props {
   item: SinceItem;
   onMarkDone: (item: SinceItem) => void;
   onEdit: (item: SinceItem) => void;
+  onPress: (item: SinceItem) => void;
 }
 
-export default function ItemCard({ item, onMarkDone, onEdit }: Props) {
+export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
   const status = computeItemStatus(item);
   const { label, daysSince } = status;
   const secondary = secondaryLine(status);
@@ -27,7 +28,10 @@ export default function ItemCard({ item, onMarkDone, onEdit }: Props) {
       {/* Status accent bar — left edge, colour-coded */}
       <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
-      <View style={styles.content}>
+      <TouchableOpacity
+        style={styles.content}
+        onPress={() => onPress(item)}
+        activeOpacity={0.7}>
         {/* Row 1: name + edit link */}
         <View style={styles.topRow}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
@@ -72,7 +76,7 @@ export default function ItemCard({ item, onMarkDone, onEdit }: Props) {
             <Text style={styles.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

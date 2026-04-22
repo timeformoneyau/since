@@ -48,6 +48,10 @@ export default function MainListScreen() {
     navigation.navigate('Edit', { itemId: item.id });
   }
 
+  function handlePress(item: SinceItem) {
+    navigation.navigate('Detail', { itemId: item.id });
+  }
+
   if (items.length === 0) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -107,6 +111,7 @@ export default function MainListScreen() {
             item={item}
             onMarkDone={handleMarkDone}
             onEdit={handleEdit}
+            onPress={handlePress}
           />
         )}
         contentContainerStyle={styles.list}
