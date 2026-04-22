@@ -2,6 +2,7 @@
   "expo": {
     "name": "Since",
     "slug": "since",
+    "scheme": "since",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -11,7 +12,7 @@
     },
     "android": {
       "package": "com.since.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",

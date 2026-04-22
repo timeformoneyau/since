@@ -42,9 +42,19 @@ export const DEFAULT_CATEGORIES = [
   'Other',
 ] as const;
 
+// Main app navigation
 export type RootStackParamList = {
   Main: undefined;
   Add: undefined;
   Edit: { itemId: string };
   Detail: { itemId: string };
+  Account: undefined;
+  ChangePassword: undefined;
+};
+
+// Auth flow navigation
+export type AuthStackParamList = {
+  SignIn: undefined;
+  SignUp: undefined;
+  ForgotPassword: undefined;
 };

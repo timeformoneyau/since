@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SinceItem, RootStackParamList } from '../types';
 import { DerivedItem } from '../domain/items/types';
 import { getDerivedItems, markItemDone } from '../domain/items/service';
+import { getUser } from '../domain/auth/service';
 import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
@@ -28,6 +29,13 @@ const QUICK_START = [
 export default function MainListScreen() {
   const navigation = useNavigation<Nav>();
   const [items, setItems] = useState<DerivedItem[]>([]);
+  const [userInitial, setUserInitial] = useState('');
+
+  useEffect(() => {
+    getUser().then((u) => {
+      if (u?.email) setUserInitial(u.email[0].toUpperCase());
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     setItems(await getDerivedItems());
@@ -94,13 +102,22 @@ export default function MainListScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Since</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => navigation.navigate('Add')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.addBtnText}>＋</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.avatarBtn}
+            onPress={() => navigation.navigate('Account')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.avatarBtnText}>{userInitial || '?'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => navigation.navigate('Add')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.addBtnText}>＋</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -205,6 +222,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colours.textPrimary,
     letterSpacing: -0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatarBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colours.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colours.textSecondary,
   },
   addBtn: {
     width: 36,
