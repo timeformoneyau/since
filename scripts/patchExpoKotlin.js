@@ -1,57 +1,71 @@
 #!/usr/bin/env node
 /**
- * Patches ExpoRootProjectPlugin.kt to hardcode the Kotlin version used for KSP
- * resolution, bypassing the expoLibs version catalog.
+ * Post-install patches for Expo + React Native 0.76 + Gradle 8.14 compatibility.
  *
- * WHY: expo-root-project resolves kotlinVersion via:
- *   extra.setIfNotExist("kotlinVersion") { versionCatalogs.getVersionOrDefault("kotlin", ...) }
- * With React Native 0.76, the generated expoLibs catalog sets kotlin="1.9.24".
- * That version is absent from the KSP lookup map (only 2.x is supported), causing
- * the build to throw. Replacing the catalog lookup with a literal "2.1.0" fixes it.
+ * Patch 1 — ExpoRootProjectPlugin.kt (kotlinVersion):
+ *   expo-root-project resolves kotlinVersion via the expoLibs version catalog.
+ *   RN 0.76 sets kotlin="1.9.24" in that catalog, which is absent from the KSP
+ *   lookup map (only 2.x supported), causing a build failure. We replace the
+ *   catalog lookup with a literal "2.1.0".
  *
- * The Kotlin source is compiled by Gradle at build time, so patching it here
- * (during npm postinstall, before Gradle starts) takes effect correctly.
+ * Patch 2 — ReactExtension.kt (enableBundleCompression):
+ *   Expo SDK 54's app/build.gradle template sets enableBundleCompression, but
+ *   RN 0.76 removed that property from ReactExtension. We add it back as a no-op.
+ *
+ * Both files are Kotlin sources compiled by Gradle at build time, so patching
+ * them during npm postinstall (before Gradle starts) takes effect correctly.
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const KOTLIN_VERSION = '2.1.0';
+const ROOT = path.join(__dirname, '..');
 
-const PLUGIN_PATH = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  'expo-modules-autolinking',
-  'android',
-  'expo-gradle-plugin',
-  'expo-autolinking-plugin',
-  'src',
-  'main',
-  'kotlin',
-  'expo',
-  'modules',
-  'plugin',
-  'ExpoRootProjectPlugin.kt'
-);
-
-if (!fs.existsSync(PLUGIN_PATH)) {
-  console.log('[patchExpoKotlin] ExpoRootProjectPlugin.kt not found — skipping');
-  process.exit(0);
+function patch(label, filePath, fn) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`[patchExpoKotlin] ${label}: file not found — skipping`);
+    return;
+  }
+  const original = fs.readFileSync(filePath, 'utf8');
+  const patched = fn(original);
+  if (patched === original) {
+    console.log(`[patchExpoKotlin] ${label}: already patched or pattern changed`);
+  } else {
+    fs.writeFileSync(filePath, patched);
+    console.log(`[patchExpoKotlin] ${label}: patched OK`);
+  }
 }
 
-let content = fs.readFileSync(PLUGIN_PATH, 'utf8');
-
-// Replace the version-catalog kotlinVersion lookup with a hardcoded value.
-// Matches: versionCatalogs.getVersionOrDefault("kotlin", "<anything>")
-const patched = content.replace(
-  /versionCatalogs\.getVersionOrDefault\("kotlin"[^)]*\)/,
-  `"${KOTLIN_VERSION}" /* patched: hardcoded for RN 0.76 compat */`
+// Patch 1: hardcode kotlinVersion in ExpoRootProjectPlugin.kt
+patch(
+  'ExpoRootProjectPlugin.kt (kotlinVersion)',
+  path.join(
+    ROOT,
+    'node_modules/expo-modules-autolinking/android/expo-gradle-plugin',
+    'expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/ExpoRootProjectPlugin.kt'
+  ),
+  (src) =>
+    src.replace(
+      /versionCatalogs\.getVersionOrDefault\("kotlin"[^)]*\)/,
+      '"2.1.0" /* patched: hardcoded for RN 0.76 compat */'
+    )
 );
 
-if (patched === content) {
-  console.log('[patchExpoKotlin] Pattern not found — already patched or file changed');
-} else {
-  fs.writeFileSync(PLUGIN_PATH, patched);
-  console.log(`[patchExpoKotlin] Patched kotlinVersion → ${KOTLIN_VERSION}`);
-}
+// Patch 2: add enableBundleCompression back to ReactExtension as a no-op.
+// RN 0.76 removed this property but Expo SDK 54's app/build.gradle still sets it.
+patch(
+  'ReactExtension.kt (enableBundleCompression)',
+  path.join(
+    ROOT,
+    'node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin',
+    'com/facebook/react/ReactExtension.kt'
+  ),
+  (src) => {
+    if (src.includes('enableBundleCompression')) return src; // already present
+    // Insert the no-op property after the opening of the abstract class body
+    return src.replace(
+      /(abstract\s+class\s+ReactExtension[^{]*\{)/,
+      '$1\n  // Added by patchExpoKotlin: RN 0.76 removed this but SDK 54 template still sets it\n  @Suppress("unused") var enableBundleCompression: Boolean = false\n'
+    );
+  }
+);
