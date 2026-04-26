@@ -22,6 +22,11 @@
     "plugins": [
       "expo-notifications",
       "./plugins/withKotlinVersion"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "97642b6b-bcea-426d-95bc-354aae8e6feb"
+      }
+    }
   }
 }
