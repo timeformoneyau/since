@@ -1,45 +1,46 @@
-const { withProjectBuildGradle, withGradleProperties } = require('@expo/config-plugins');
+const { withDangerousMod } = require('@expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
 
 const KOTLIN_VERSION = '2.1.0';
 
 module.exports = function withKotlinVersion(config) {
-  // 1. android/gradle.properties — read by Gradle before any build scripts
-  config = withGradleProperties(config, (config) => {
-    config.modResults = config.modResults.filter(
-      (item) => !(item.type === 'property' && item.key === 'kotlinVersion')
-    );
-    config.modResults.push({ type: 'property', key: 'kotlinVersion', value: KOTLIN_VERSION });
-    return config;
-  });
+  return withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const root = config.modRequest.platformProjectRoot;
 
-  // 2. android/build.gradle — three strategies to ensure Kotlin 2.x is used
-  config = withProjectBuildGradle(config, (config) => {
-    let contents = config.modResults.contents;
+      // --- android/build.gradle ---
+      // The SDK 54 template has NO ext { kotlinVersion } block.
+      // expo-root-project defaults to "1.9.24" when the property is absent.
+      // The classpath entry is also unversioned; React Native's transitive
+      // dependency resolves it to 1.9.24.
+      const buildGradlePath = path.join(root, 'build.gradle');
+      let buildGradle = fs.readFileSync(buildGradlePath, 'utf8');
 
-    // Strategy A: Replace kotlinVersion in the ext block (handles "X.Y.Z" and 'X.Y.Z')
-    contents = contents.replace(
-      /kotlinVersion\s*=\s*["'][\d.]+["']/,
-      `kotlinVersion = "${KOTLIN_VERSION}"`
-    );
+      // Fix 1: inject ext.kotlinVersion right before expo-root-project is applied
+      buildGradle = buildGradle.replace(
+        /(\bapply\s+plugin\s*:\s*["']expo-root-project["'])/,
+        `ext.kotlinVersion = "${KOTLIN_VERSION}"\n$1`
+      );
 
-    // Strategy B: Inject ext override immediately before expo-root-project is applied.
-    // This fires regardless of how the plugin reads kotlinVersion (ext, classpath, etc.).
-    contents = contents.replace(
-      /(\bapply\s+plugin\s*:\s*['"]expo-root-project['"])/,
-      `ext.kotlinVersion = "${KOTLIN_VERSION}"\n$1`
-    );
+      // Fix 2: add explicit version to the unversioned kotlin-gradle-plugin
+      // classpath so the actual Kotlin compiler used is also 2.x
+      buildGradle = buildGradle.replace(
+        /org\.jetbrains\.kotlin:kotlin-gradle-plugin(["')])/g,
+        `org.jetbrains.kotlin:kotlin-gradle-plugin:${KOTLIN_VERSION}$1`
+      );
 
-    // Strategy C: Hardcode the kotlin-gradle-plugin classpath so the JVM classpath
-    // version also matches (catches the case where expo-root-project reads
-    // KotlinCompilerVersion.VERSION from the stdlib jar rather than ext properties).
-    contents = contents.replace(
-      /org\.jetbrains\.kotlin:kotlin-gradle-plugin:[^"'\s)]+/,
-      `org.jetbrains.kotlin:kotlin-gradle-plugin:${KOTLIN_VERSION}`
-    );
+      fs.writeFileSync(buildGradlePath, buildGradle);
 
-    config.modResults.contents = contents;
-    return config;
-  });
+      // --- android/gradle.properties ---
+      const propsPath = path.join(root, 'gradle.properties');
+      let props = fs.readFileSync(propsPath, 'utf8');
+      props = props.replace(/^\s*kotlinVersion\s*=.*$/m, '');
+      props += `\nkotlinVersion=${KOTLIN_VERSION}\n`;
+      fs.writeFileSync(propsPath, props);
 
-  return config;
+      return config;
+    },
+  ]);
 };
