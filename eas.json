@@ -5,10 +5,7 @@
   "build": {
     "preview": {
       "android": {
-        "buildType": "apk",
-        "env": {
-          "ORG_GRADLE_PROJECT_kotlinVersion": "2.1.0"
-        }
+        "buildType": "apk"
       }
     }
   }

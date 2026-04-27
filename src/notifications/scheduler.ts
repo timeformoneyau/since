@@ -7,7 +7,6 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { SinceItem } from '../types';
 
 export {
   scheduleItemNotifications,
