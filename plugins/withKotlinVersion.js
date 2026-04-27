@@ -1,4 +1,4 @@
-const { withProjectBuildGradle, withAppBuildGradle } = require('@expo/config-plugins');
+const { withProjectBuildGradle } = require('@expo/config-plugins');
 
 const KOTLIN_VERSION = '2.1.0';
 // Must match KSPLookup in expo-modules-autolinking for the chosen Kotlin version.
@@ -11,7 +11,7 @@ module.exports = function withKotlinVersion(config) {
   // absent from the KSP lookup map (only 2.x is supported) and causes a build failure.
   // Pre-populating both ext properties at the top of build.gradle causes setIfNotExist
   // to return our values immediately, bypassing the catalog lookup and the KSP lookup.
-  config = withProjectBuildGradle(config, (config) => {
+  return withProjectBuildGradle(config, (config) => {
     let contents = config.modResults.contents;
     if (!contents.includes('ext.kotlinVersion')) {
       contents =
@@ -22,16 +22,6 @@ module.exports = function withKotlinVersion(config) {
     config.modResults.contents = contents;
     return config;
   });
-
-  // RN 0.76 removed enableBundleCompression from ReactExtension but Expo SDK 54's
-  // app/build.gradle template still sets it, causing "unknown property" at build time.
-  config = withAppBuildGradle(config, (config) => {
-    config.modResults.contents = config.modResults.contents.replace(
-      /[ \t]*enableBundleCompression\s*=\s*\S+[ \t]*\n?/g,
-      ''
-    );
-    return config;
-  });
-
-  return config;
+  // enableBundleCompression is handled by scripts/patchExpoKotlin.js (Patch 2),
+  // which adds the no-op property back to ReactExtension.kt at postinstall time.
 };
