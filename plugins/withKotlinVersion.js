@@ -56,10 +56,10 @@ module.exports = function withKotlinVersion(config) {
   });
 
   config = withGradleProperties(config, (cfg) => {
-    const props = cfg.modResults;
-    if (!props.find((p) => p.type === 'property' && p.key === 'newArchEnabled')) {
-      props.push({ type: 'property', key: 'newArchEnabled', value: 'false' });
-    }
+    cfg.modResults = cfg.modResults.filter(
+      (p) => !(p.type === 'property' && p.key === 'newArchEnabled')
+    );
+    cfg.modResults.push({ type: 'property', key: 'newArchEnabled', value: 'false' });
     return cfg;
   });
 
