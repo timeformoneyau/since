@@ -35,12 +35,10 @@ module.exports = function withKotlinVersion(config) {
     const output = [];
     let inBlock = false;
     let depth = 0;
-    let insertAt = null;
 
     for (const line of lines) {
       if (!inBlock && /^\s*react\s*\{/.test(line)) {
         inBlock = true;
-        insertAt = output.length;
         depth = (line.split('{').length - 1) - (line.split('}').length - 1);
         if (depth <= 0) inBlock = false;
         continue;
@@ -51,15 +49,6 @@ module.exports = function withKotlinVersion(config) {
         continue;
       }
       output.push(line);
-    }
-
-    // Re-insert a corrected react { } block at the same position.
-    if (insertAt !== null) {
-      output.splice(insertAt, 0,
-        'react {',
-        '    bundleCommand = "export:embed"',
-        '}',
-      );
     }
 
     cfg.modResults.contents = output.join('\n');
