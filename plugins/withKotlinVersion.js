@@ -1,4 +1,4 @@
-const { withProjectBuildGradle, withAppBuildGradle } = require('@expo/config-plugins');
+const { withProjectBuildGradle, withAppBuildGradle, withGradleProperties } = require('@expo/config-plugins');
 
 const KOTLIN_VERSION = '2.1.0';
 // Must match KSPLookup in expo-modules-autolinking for the chosen Kotlin version.
@@ -52,6 +52,14 @@ module.exports = function withKotlinVersion(config) {
     }
 
     cfg.modResults.contents = output.join('\n');
+    return cfg;
+  });
+
+  config = withGradleProperties(config, (cfg) => {
+    const props = cfg.modResults;
+    if (!props.find((p) => p.type === 'property' && p.key === 'newArchEnabled')) {
+      props.push({ type: 'property', key: 'newArchEnabled', value: 'false' });
+    }
     return cfg;
   });
 
