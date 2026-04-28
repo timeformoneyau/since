@@ -25,19 +25,22 @@ module.exports = function withKotlinVersion(config) {
 
   // RN 0.76 removed enableBundleCompression from ReactExtension but Expo SDK 54's
   // app/build.gradle template still generates a `react { enableBundleCompression = false }`
-  // block. Stripping just the property leaves an empty `react { }` block, which Gradle
-  // 8.14+ fails to parse in Groovy DSL. Regex-based block removal is unsafe because
-  // \s* can span newlines and match unrelated content (e.g. inside apply from: strings).
-  // Use a line-by-line brace counter instead.
+  // block. We replace it with a correct minimal block that sets bundleCommand to
+  // "export:embed" (the Expo CLI bundler). Without this, BundleHermesCTask falls back to
+  // `react-native bundle` which requires @react-native-community/cli — not installed in
+  // Expo managed workflow. Use a line-by-line brace counter to safely remove the old block
+  // (regex with \s* spans newlines and can corrupt unrelated file content).
   config = withAppBuildGradle(config, (cfg) => {
     const lines = cfg.modResults.contents.split('\n');
     const output = [];
     let inBlock = false;
     let depth = 0;
+    let insertAt = null;
 
     for (const line of lines) {
       if (!inBlock && /^\s*react\s*\{/.test(line)) {
         inBlock = true;
+        insertAt = output.length;
         depth = (line.split('{').length - 1) - (line.split('}').length - 1);
         if (depth <= 0) inBlock = false;
         continue;
@@ -48,6 +51,15 @@ module.exports = function withKotlinVersion(config) {
         continue;
       }
       output.push(line);
+    }
+
+    // Re-insert a corrected react { } block at the same position.
+    if (insertAt !== null) {
+      output.splice(insertAt, 0,
+        'react {',
+        '    bundleCommand = "export:embed"',
+        '}',
+      );
     }
 
     cfg.modResults.contents = output.join('\n');
