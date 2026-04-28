@@ -24,11 +24,13 @@ module.exports = function withKotlinVersion(config) {
   });
 
   // RN 0.76 removed enableBundleCompression from ReactExtension but Expo SDK 54's
-  // app/build.gradle template still sets it, causing "unknown property" at build time.
+  // app/build.gradle template still generates a `react { enableBundleCompression = false }`
+  // block. Stripping just the property leaves an empty `react { }` block, which Gradle
+  // 8.14+ fails to parse in Groovy DSL with "Unexpected input: '{'". Remove the whole block.
   config = withAppBuildGradle(config, (cfg) => {
     cfg.modResults.contents = cfg.modResults.contents.replace(
-      /[ \t]*enableBundleCompression\s*=\s*\S+[ \t]*\n?/g,
-      ''
+      /\n?[ \t]*react\s*\{[^}]*\}\n?/g,
+      '\n'
     );
     return cfg;
   });
