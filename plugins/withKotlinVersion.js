@@ -26,12 +26,31 @@ module.exports = function withKotlinVersion(config) {
   // RN 0.76 removed enableBundleCompression from ReactExtension but Expo SDK 54's
   // app/build.gradle template still generates a `react { enableBundleCompression = false }`
   // block. Stripping just the property leaves an empty `react { }` block, which Gradle
-  // 8.14+ fails to parse in Groovy DSL with "Unexpected input: '{'". Remove the whole block.
+  // 8.14+ fails to parse in Groovy DSL. Regex-based block removal is unsafe because
+  // \s* can span newlines and match unrelated content (e.g. inside apply from: strings).
+  // Use a line-by-line brace counter instead.
   config = withAppBuildGradle(config, (cfg) => {
-    cfg.modResults.contents = cfg.modResults.contents.replace(
-      /\n?[ \t]*react\s*\{[^}]*\}\n?/g,
-      '\n'
-    );
+    const lines = cfg.modResults.contents.split('\n');
+    const output = [];
+    let inBlock = false;
+    let depth = 0;
+
+    for (const line of lines) {
+      if (!inBlock && /^\s*react\s*\{/.test(line)) {
+        inBlock = true;
+        depth = (line.split('{').length - 1) - (line.split('}').length - 1);
+        if (depth <= 0) inBlock = false;
+        continue;
+      }
+      if (inBlock) {
+        depth += (line.split('{').length - 1) - (line.split('}').length - 1);
+        if (depth <= 0) inBlock = false;
+        continue;
+      }
+      output.push(line);
+    }
+
+    cfg.modResults.contents = output.join('\n');
     return cfg;
   });
 
