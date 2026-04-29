@@ -1,0 +1,16 @@
+workflows:
+  android-apk:
+    name: Android Debug APK
+    max_build_duration: 60
+    environment:
+      node: 20.17.0
+      java: 17
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Expo prebuild
+        script: npx expo prebuild --platform android --clean
+      - name: Build APK
+        script: cd android && ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/app-debug.apk
