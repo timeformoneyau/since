@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -14,10 +15,14 @@ import { SinceItem, RootStackParamList } from '../types';
 import { DerivedItem } from '../domain/items/types';
 import { getDerivedItems, markItemDone } from '../domain/items/service';
 import { getUser } from '../domain/auth/service';
+import { loadPinnedIds, togglePin } from '../domain/items/pins';
+import { statusSortOrder } from '../utils/statusUtils';
 import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
+type SortMode = 'status' | 'newest' | 'due';
+type GroupMode = 'all' | 'grouped' | string;
 
 const QUICK_START = [
   { name: 'Dentist', category: 'Health' },
@@ -26,15 +31,91 @@ const QUICK_START = [
   { name: 'Smoke alarm', category: 'Household' },
 ];
 
+function applySort(items: DerivedItem[], mode: SortMode): DerivedItem[] {
+  switch (mode) {
+    case 'newest':
+      return [...items].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    case 'due':
+      return [...items].sort((a, b) => {
+        const ad = a.status.daysUntilDue;
+        const bd = b.status.daysUntilDue;
+        if (ad !== null && bd !== null) return ad - bd;
+        if (ad !== null) return -1;
+        if (bd !== null) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    default:
+      return [...items].sort((a, b) => {
+        const od = statusSortOrder(a.status.label) - statusSortOrder(b.status.label);
+        if (od !== 0) return od;
+        if (a.status.daysUntilDue !== null && b.status.daysUntilDue !== null) {
+          return a.status.daysUntilDue - b.status.daysUntilDue;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }
+}
+
+// Pinned items: soonest due first, then newest created for items without a repeat
+function sortPinned(items: DerivedItem[]): DerivedItem[] {
+  return [...items].sort((a, b) => {
+    const ad = a.status.daysUntilDue;
+    const bd = b.status.daysUntilDue;
+    if (ad !== null && bd !== null) return ad - bd;
+    if (ad !== null) return -1;
+    if (bd !== null) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+type ListSection = { title: string; data: DerivedItem[] };
+
+function buildSections(
+  items: DerivedItem[],
+  pinnedIds: Set<string>,
+  sortMode: SortMode,
+  groupMode: GroupMode,
+): ListSection[] {
+  const pinnedItems = sortPinned(items.filter((i) => pinnedIds.has(i.id)));
+  const rest = applySort(items.filter((i) => !pinnedIds.has(i.id)), sortMode);
+
+  const sections: ListSection[] = [];
+
+  if (pinnedItems.length > 0) {
+    sections.push({ title: 'Pinned', data: pinnedItems });
+  }
+
+  if (groupMode === 'all') {
+    if (rest.length > 0) sections.push({ title: '', data: rest });
+  } else if (groupMode === 'grouped') {
+    const cats = [...new Set(rest.map((i) => i.category))].sort();
+    for (const cat of cats) {
+      const catItems = rest.filter((i) => i.category === cat);
+      if (catItems.length > 0) sections.push({ title: cat, data: catItems });
+    }
+  } else {
+    const catItems = rest.filter((i) => i.category === groupMode);
+    if (catItems.length > 0) sections.push({ title: groupMode, data: catItems });
+  }
+
+  return sections;
+}
+
 export default function MainListScreen() {
   const navigation = useNavigation<Nav>();
   const [items, setItems] = useState<DerivedItem[]>([]);
   const [userInitial, setUserInitial] = useState('');
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [sortMode, setSortMode] = useState<SortMode>('status');
+  const [groupMode, setGroupMode] = useState<GroupMode>('all');
 
   useEffect(() => {
     getUser().then((u) => {
       if (u?.email) setUserInitial(u.email[0].toUpperCase());
     });
+    loadPinnedIds().then(setPinnedIds);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -60,6 +141,21 @@ export default function MainListScreen() {
     navigation.navigate('Detail', { itemId: item.id });
   }
 
+  async function handleTogglePin(item: SinceItem) {
+    const next = await togglePin(item.id, pinnedIds);
+    setPinnedIds(new Set(next));
+  }
+
+  const categories = useMemo(
+    () => [...new Set(items.map((i) => i.category))].sort(),
+    [items],
+  );
+
+  const sections = useMemo(
+    () => buildSections(items, pinnedIds, sortMode, groupMode),
+    [items, pinnedIds, sortMode, groupMode],
+  );
+
   if (items.length === 0) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -70,14 +166,12 @@ export default function MainListScreen() {
           <Text style={styles.appSupport}>
             Track the things you don't do often enough and we'll keep count for you.
           </Text>
-
           <TouchableOpacity
             style={styles.primaryCTA}
             onPress={() => navigation.navigate('Add')}
           >
             <Text style={styles.primaryCTAText}>Add something</Text>
           </TouchableOpacity>
-
           <Text style={styles.quickStartLabel}>Quick start</Text>
           <View style={styles.quickStartRow}>
             {QUICK_START.map((q) => (
@@ -95,11 +189,22 @@ export default function MainListScreen() {
     );
   }
 
+  const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+    { key: 'status', label: 'Status' },
+    { key: 'newest', label: 'Newest' },
+    { key: 'due', label: 'Due date' },
+  ];
+
+  const GROUP_OPTIONS: { key: GroupMode; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'grouped', label: 'Grouped' },
+    ...categories.map((c) => ({ key: c, label: c })),
+  ];
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={colours.background} />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Since</Text>
         <View style={styles.headerActions}>
@@ -120,19 +225,69 @@ export default function MainListScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={items}
+      {/* Sort controls */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.controlRow}
+        contentContainerStyle={styles.controlRowContent}
+      >
+        {SORT_OPTIONS.map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.pill, sortMode === key && styles.pillActive]}
+            onPress={() => setSortMode(key)}
+          >
+            <Text style={[styles.pillText, sortMode === key && styles.pillTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Group / filter controls */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.controlRow}
+        contentContainerStyle={styles.controlRowContent}
+      >
+        {GROUP_OPTIONS.map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.pill, groupMode === key && styles.pillActive]}
+            onPress={() => setGroupMode(key)}
+          >
+            <Text style={[styles.pillText, groupMode === key && styles.pillTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ItemCard
             item={item}
+            pinned={pinnedIds.has(item.id)}
             onMarkDone={handleMarkDone}
             onEdit={handleEdit}
             onPress={handlePress}
+            onTogglePin={handleTogglePin}
           />
         )}
+        renderSectionHeader={({ section }) =>
+          section.title ? (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            </View>
+          ) : null
+        }
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
   );
@@ -208,14 +363,14 @@ const styles = StyleSheet.create({
     color: colours.textSecondary,
   },
 
-  // List header
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   headerTitle: {
     fontSize: 28,
@@ -256,8 +411,53 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
 
+  // Control bars
+  controlRow: {
+    flexGrow: 0,
+    marginBottom: 4,
+  },
+  controlRowContent: {
+    paddingHorizontal: 16,
+    gap: 6,
+    flexDirection: 'row',
+  },
+  pill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colours.border,
+    backgroundColor: colours.surface,
+  },
+  pillActive: {
+    backgroundColor: colours.textPrimary,
+    borderColor: colours.textPrimary,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colours.textSecondary,
+  },
+  pillTextActive: {
+    color: '#fff',
+  },
+
+  // Section headers
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colours.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+
   list: {
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 32,
   },
 });

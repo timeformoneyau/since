@@ -12,12 +12,14 @@ import { colours, statusColour } from './colours';
 
 interface Props {
   item: SinceItem;
+  pinned: boolean;
   onMarkDone: (item: SinceItem) => void;
   onEdit: (item: SinceItem) => void;
   onPress: (item: SinceItem) => void;
+  onTogglePin: (item: SinceItem) => void;
 }
 
-export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
+export default function ItemCard({ item, pinned, onMarkDone, onEdit, onPress, onTogglePin }: Props) {
   const status = computeItemStatus(item);
   const { label, daysSince } = status;
   const secondary = secondaryLine(status);
@@ -25,19 +27,28 @@ export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Status accent bar — left edge, colour-coded */}
       <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
       <TouchableOpacity
         style={styles.content}
         onPress={() => onPress(item)}
         activeOpacity={0.7}>
-        {/* Row 1: name + edit link */}
+
         <View style={styles.topRow}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
           <TouchableOpacity
+            onPress={() => onTogglePin(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.pinIcon, pinned && styles.pinIconActive]}>
+              {pinned ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => onEdit(item)}
-            hitSlop={{ top: 10, bottom: 10, left: 16, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
             accessibilityLabel={`Edit ${item.name}`}
             accessibilityRole="button"
           >
@@ -45,12 +56,10 @@ export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Row 2: how long it's been */}
         <Text style={styles.sinceText}>
           {daysSince === 0 ? 'Done today' : `Last done ${humaniseDaysSince(daysSince)}`}
         </Text>
 
-        {/* Row 3: status label + secondary info + done button */}
         <View style={styles.bottomRow}>
           <View style={styles.statusInfo}>
             {label !== null ? (
@@ -88,12 +97,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colours.surface,
     flexDirection: 'row',
-    // Shadow — iOS
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 6,
-    // Shadow — Android
     elevation: 3,
   },
   accentBar: {
@@ -106,20 +113,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-
-  // Row 1
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 5,
+    gap: 10,
   },
   name: {
     fontSize: 16,
     fontWeight: '600',
     color: colours.textPrimary,
     flex: 1,
-    marginRight: 10,
+  },
+  pinIcon: {
+    fontSize: 16,
+    color: colours.textMuted,
+    lineHeight: 20,
+  },
+  pinIconActive: {
+    color: '#C8842A',
   },
   editLink: {
     fontSize: 13,
@@ -127,15 +140,11 @@ const styles = StyleSheet.create({
     color: colours.textMuted,
     letterSpacing: 0.1,
   },
-
-  // Row 2
   sinceText: {
     fontSize: 13,
     color: colours.textSecondary,
     marginBottom: 10,
   },
-
-  // Row 3
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
