@@ -7,14 +7,21 @@ import {
   SafeAreaView,
   Alert,
   ScrollView,
+  StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
+import { Ionicons } from '@expo/vector-icons';
+import { RootStackParamList, TabParamList } from '../types';
 import { getUser, signOut, deleteAccount } from '../domain/auth/service';
 import { colours } from '../components/colours';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Account'>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Account'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export default function AccountScreen() {
   const navigation = useNavigation<Nav>();
@@ -26,16 +33,15 @@ export default function AccountScreen() {
     });
   }, []);
 
+  const displayName = email ? email.split('@')[0] : '';
+
   async function handleSignOut() {
-    Alert.alert('Sign out', 'You\'ll need to sign back in to access your data.', [
+    Alert.alert('Sign out', "You'll need to sign back in to access your data.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
         style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          // App.tsx auth gate handles navigation automatically
-        },
+        onPress: async () => { await signOut(); },
       },
     ]);
   }
@@ -63,44 +69,53 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <StatusBar barStyle="dark-content" backgroundColor={colours.background} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Avatar + email */}
+        {/* Profile block */}
         <View style={styles.profileBlock}>
           <View style={styles.avatar}>
             <Text style={styles.avatarLetter}>
               {email ? email[0].toUpperCase() : '?'}
             </Text>
           </View>
+          {displayName !== '' && (
+            <Text style={styles.displayName}>{displayName}</Text>
+          )}
           <Text style={styles.emailText}>{email || 'Loading…'}</Text>
         </View>
 
-        {/* Security section */}
-        <Text style={styles.sectionTitle}>Security</Text>
+        {/* Account section */}
+        <Text style={styles.sectionTitle}>ACCOUNT</Text>
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('ChangePassword')}
           >
-            <Text style={styles.rowLabel}>Change password</Text>
-            <Text style={styles.rowChevron}>›</Text>
+            <View style={styles.rowLeft}>
+              <Ionicons name="lock-closed-outline" size={18} color={colours.textSecondary} style={styles.rowIcon} />
+              <Text style={styles.rowLabel}>Change password</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colours.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Danger actions */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.row} onPress={handleSignOut}>
+            <View style={styles.rowLeft}>
+              <Ionicons name="log-out-outline" size={18} color={colours.destructive} style={styles.rowIcon} />
+              <Text style={[styles.rowLabel, { color: colours.destructive }]}>Sign out</Text>
+            </View>
           </TouchableOpacity>
 
           <View style={styles.separator} />
 
-          <TouchableOpacity style={styles.row} onPress={handleSignOut}>
-            <Text style={styles.rowLabel}>Sign out</Text>
-            <Text style={styles.rowChevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Danger zone */}
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.section}>
           <TouchableOpacity style={styles.row} onPress={handleDeleteAccount}>
-            <Text style={[styles.rowLabel, { color: colours.destructive }]}>
-              Delete account
-            </Text>
+            <View style={styles.rowLeft}>
+              <Ionicons name="trash-outline" size={18} color={colours.destructive} style={styles.rowIcon} />
+              <Text style={[styles.rowLabel, { color: colours.destructive }]}>Delete account</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -120,17 +135,19 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 16,
     paddingBottom: 48,
   },
+
+  // Profile
   profileBlock: {
     alignItems: 'center',
     paddingVertical: 32,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colours.textPrimary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -138,28 +155,38 @@ const styles = StyleSheet.create({
   },
   avatarLetter: {
     color: '#fff',
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '600',
+  },
+  displayName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colours.textPrimary,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+    textTransform: 'capitalize',
   },
   emailText: {
-    fontSize: 15,
-    color: colours.textSecondary,
+    fontSize: 14,
+    color: colours.amber,
+    fontWeight: '500',
   },
+
+  // Sections
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: colours.textMuted,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    letterSpacing: 0.9,
     marginBottom: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   section: {
     backgroundColor: colours.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colours.border,
-    marginBottom: 28,
+    marginBottom: 24,
     overflow: 'hidden',
   },
   row: {
@@ -169,14 +196,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowIcon: {
+    marginRight: 12,
+  },
   rowLabel: {
     fontSize: 15,
     color: colours.textPrimary,
-  },
-  rowChevron: {
-    fontSize: 20,
-    color: colours.textMuted,
-    lineHeight: 22,
   },
   separator: {
     height: 1,
@@ -189,5 +218,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 16,
+    marginTop: 8,
   },
 });

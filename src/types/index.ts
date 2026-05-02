@@ -42,13 +42,19 @@ export const DEFAULT_CATEGORIES = [
   'Other',
 ] as const;
 
-// Main app navigation
+// Tab navigator screens
+export type TabParamList = {
+  Habits: undefined;
+  AddTab: undefined;
+  Account: undefined;
+};
+
+// Main app stack (screens presented over the tab navigator)
 export type RootStackParamList = {
-  Main: undefined;
+  Tabs: undefined;
   Add: undefined;
   Edit: { itemId: string };
   Detail: { itemId: string };
-  Account: undefined;
   ChangePassword: undefined;
 };
 

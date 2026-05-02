@@ -3,11 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './src/lib/supabase';
-import { RootStackParamList, AuthStackParamList } from './src/types';
+import { RootStackParamList, TabParamList, AuthStackParamList } from './src/types';
 import { colours } from './src/components/colours';
 import { migrateLocalItemsToCloud } from './src/domain/items/service';
 import { requestNotificationPermissions, rescheduleAllNotifications } from './src/notifications/scheduler';
@@ -35,33 +37,115 @@ Notifications.setNotificationHandler({
 });
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 
-const stackOptions = {
-  headerStyle: { backgroundColor: colours.background },
-  headerShadowVisible: false,
-  headerTintColor: colours.textPrimary,
-  headerBackTitle: 'Back',
-  contentStyle: { backgroundColor: colours.background },
-  headerTitleStyle: { fontWeight: '600' as const, fontSize: 17 },
-};
+function AddPlaceholder() {
+  return null;
+}
+
+function TabNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colours.surface,
+          borderTopColor: colours.border,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: colours.textPrimary,
+        tabBarInactiveTintColor: colours.textSecondary,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Habits"
+        component={MainListScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="AddTab"
+        component={AddPlaceholder}
+        options={{
+          tabBarLabel: 'Add',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle-outline" size={size} color={color} />
+          ),
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.getParent()?.navigate('Add');
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 function AppNavigator() {
   return (
-    <AppStack.Navigator screenOptions={stackOptions}>
-      <AppStack.Screen name="Main" component={MainListScreen} options={{ headerShown: false }} />
-      <AppStack.Screen name="Add" component={AddItemScreen} options={{ title: 'Track something' }} />
-      <AppStack.Screen name="Edit" component={EditItemScreen} options={{ title: 'Edit' }} />
-      <AppStack.Screen name="Detail" component={DetailScreen} options={{ headerShown: false }} />
-      <AppStack.Screen name="Account" component={AccountScreen} options={{ title: 'Account' }} />
-      <AppStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change password' }} />
+    <AppStack.Navigator screenOptions={{ headerShown: false }}>
+      <AppStack.Screen name="Tabs" component={TabNavigator} />
+      <AppStack.Screen
+        name="Add"
+        component={AddItemScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <AppStack.Screen
+        name="Edit"
+        component={EditItemScreen}
+        options={{
+          headerShown: true,
+          title: 'Edit',
+          headerStyle: { backgroundColor: colours.background },
+          headerShadowVisible: false,
+          headerTintColor: colours.textPrimary,
+          headerTitleStyle: { fontWeight: '600' as const },
+        }}
+      />
+      <AppStack.Screen name="Detail" component={DetailScreen} />
+      <AppStack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{
+          headerShown: true,
+          title: 'Change Password',
+          headerStyle: { backgroundColor: colours.background },
+          headerShadowVisible: false,
+          headerTintColor: colours.textPrimary,
+          headerTitleStyle: { fontWeight: '600' as const },
+        }}
+      />
     </AppStack.Navigator>
   );
 }
 
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ ...stackOptions, headerShown: false }}>
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="SignIn" component={SignInScreen} />
       <AuthStack.Screen name="SignUp" component={SignUpScreen} />
       <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
@@ -74,21 +158,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setLoading(false);
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
 
       if (event === 'SIGNED_IN' && s) {
-        // Upload any items that were stored locally before sign-in
         migrateLocalItemsToCloud().catch(() => {});
-
-        // Schedule notifications for all items
         requestNotificationPermissions()
           .then(() => loadItems())
           .then((items) => rescheduleAllNotifications(items))

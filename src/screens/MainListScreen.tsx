@@ -10,17 +10,23 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SinceItem, RootStackParamList } from '../types';
+import { SinceItem, RootStackParamList, TabParamList } from '../types';
 import { DerivedItem } from '../domain/items/types';
-import { getDerivedItems, markItemDone } from '../domain/items/service';
+import { getDerivedItems } from '../domain/items/service';
 import { getUser } from '../domain/auth/service';
 import { loadPinnedIds, togglePin } from '../domain/items/pins';
 import { statusSortOrder } from '../utils/statusUtils';
 import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Habits'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
 type SortMode = 'status' | 'newest' | 'due';
 type GroupMode = 'all' | 'grouped' | string;
 
@@ -58,7 +64,6 @@ function applySort(items: DerivedItem[], mode: SortMode): DerivedItem[] {
   }
 }
 
-// Pinned items: soonest due first, then newest created for items without a repeat
 function sortPinned(items: DerivedItem[]): DerivedItem[] {
   return [...items].sort((a, b) => {
     const ad = a.status.daysUntilDue;
@@ -88,7 +93,7 @@ function buildSections(
   }
 
   if (groupMode === 'all') {
-    if (rest.length > 0) sections.push({ title: '', data: rest });
+    if (rest.length > 0) sections.push({ title: 'Active Habits', data: rest });
   } else if (groupMode === 'grouped') {
     const cats = [...new Set(rest.map((i) => i.category))].sort();
     for (const cat of cats) {
@@ -127,15 +132,6 @@ export default function MainListScreen() {
       refresh();
     }, [refresh]),
   );
-
-  async function handleMarkDone(item: SinceItem) {
-    await markItemDone(item.id);
-    refresh();
-  }
-
-  function handleEdit(item: SinceItem) {
-    navigation.navigate('Edit', { itemId: item.id });
-  }
 
   function handlePress(item: SinceItem) {
     navigation.navigate('Detail', { itemId: item.id });
@@ -190,77 +186,69 @@ export default function MainListScreen() {
   }
 
   const SORT_OPTIONS: { key: SortMode; label: string }[] = [
-    { key: 'status', label: 'Status' },
+    { key: 'status', label: 'Status urgency' },
     { key: 'newest', label: 'Newest' },
     { key: 'due', label: 'Due date' },
   ];
 
-  const GROUP_OPTIONS: { key: GroupMode; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'grouped', label: 'Grouped' },
-    ...categories.map((c) => ({ key: c, label: c })),
+  const CATEGORY_TABS: { key: GroupMode; label: string }[] = [
+    { key: 'all', label: 'ALL' },
+    ...categories.map((c) => ({ key: c, label: c.toUpperCase() })),
   ];
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={colours.background} />
 
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Since</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={() => navigation.navigate('Account')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.avatarBtnText}>{userInitial || '?'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('Add')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.addBtnText}>＋</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.avatarBtn}
+          onPress={() => navigation.navigate('Account')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.avatarBtnText}>{userInitial || '?'}</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Sort controls */}
+      {/* Sort pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.controlRow}
-        contentContainerStyle={styles.controlRowContent}
+        style={styles.sortRow}
+        contentContainerStyle={styles.sortRowContent}
       >
         {SORT_OPTIONS.map(({ key, label }) => (
           <TouchableOpacity
             key={key}
-            style={[styles.pill, sortMode === key && styles.pillActive]}
+            style={[styles.sortPill, sortMode === key && styles.sortPillActive]}
             onPress={() => setSortMode(key)}
           >
-            <Text style={[styles.pillText, sortMode === key && styles.pillTextActive]}>
+            <Text style={[styles.sortPillText, sortMode === key && styles.sortPillTextActive]}>
               {label}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Group / filter controls */}
+      {/* Category tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.controlRow}
-        contentContainerStyle={styles.controlRowContent}
+        style={styles.catRow}
+        contentContainerStyle={styles.catRowContent}
       >
-        {GROUP_OPTIONS.map(({ key, label }) => (
+        {CATEGORY_TABS.map(({ key, label }) => (
           <TouchableOpacity
             key={key}
-            style={[styles.pill, groupMode === key && styles.pillActive]}
+            style={styles.catTab}
             onPress={() => setGroupMode(key)}
           >
-            <Text style={[styles.pillText, groupMode === key && styles.pillTextActive]}>
+            <Text style={[styles.catTabText, groupMode === key && styles.catTabTextActive]}>
               {label}
             </Text>
+            {groupMode === key && <View style={styles.catTabUnderline} />}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -272,23 +260,32 @@ export default function MainListScreen() {
           <ItemCard
             item={item}
             pinned={pinnedIds.has(item.id)}
-            onMarkDone={handleMarkDone}
-            onEdit={handleEdit}
             onPress={handlePress}
             onTogglePin={handleTogglePin}
           />
         )}
-        renderSectionHeader={({ section }) =>
-          section.title ? (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderText}>{section.title}</Text>
-            </View>
-          ) : null
-        }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            {section.title === 'Pinned' ? (
+              <Text style={styles.sectionHeaderText}>↑  PINNED</Text>
+            ) : (
+              <Text style={styles.sectionHeaderText}>{section.title.toUpperCase()}</Text>
+            )}
+          </View>
+        )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
       />
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('Add')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -370,94 +367,132 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 10,
+    paddingBottom: 12,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: colours.textPrimary,
     letterSpacing: -0.5,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   avatarBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colours.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colours.textSecondary,
-  },
-  addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colours.textPrimary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addBtnText: {
+  avatarBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#fff',
-    fontSize: 20,
-    lineHeight: 22,
-    marginTop: -1,
   },
 
-  // Control bars
-  controlRow: {
+  // Sort pills
+  sortRow: {
     flexGrow: 0,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  controlRowContent: {
+  sortRowContent: {
     paddingHorizontal: 16,
     gap: 6,
     flexDirection: 'row',
   },
-  pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  sortPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colours.border,
     backgroundColor: colours.surface,
   },
-  pillActive: {
+  sortPillActive: {
     backgroundColor: colours.textPrimary,
     borderColor: colours.textPrimary,
   },
-  pillText: {
+  sortPillText: {
     fontSize: 13,
     fontWeight: '500',
     color: colours.textSecondary,
   },
-  pillTextActive: {
+  sortPillTextActive: {
     color: '#fff',
+    fontWeight: '600',
+  },
+
+  // Category tabs
+  catRow: {
+    flexGrow: 0,
+    marginBottom: 8,
+    marginTop: 6,
+  },
+  catRowContent: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    gap: 20,
+  },
+  catTab: {
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  catTabText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colours.textMuted,
+    letterSpacing: 0.7,
+  },
+  catTabTextActive: {
+    color: colours.textPrimary,
+  },
+  catTabUnderline: {
+    height: 2,
+    backgroundColor: colours.textPrimary,
+    borderRadius: 1,
+    marginTop: 3,
+    alignSelf: 'stretch',
   },
 
   // Section headers
   sectionHeader: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 6,
   },
   sectionHeaderText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: colours.textMuted,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
+    letterSpacing: 0.9,
   },
 
   list: {
-    paddingTop: 4,
-    paddingBottom: 32,
+    paddingTop: 2,
+    paddingBottom: 100,
+  },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colours.textPrimary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '300',
+    marginTop: -2,
   },
 });

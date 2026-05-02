@@ -1,92 +1,51 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SinceItem } from '../types';
-import { computeItemStatus, secondaryLine } from '../utils/statusUtils';
-import { humaniseDaysSince } from '../utils/dateUtils';
+import { computeItemStatus } from '../utils/statusUtils';
 import { colours, statusColour } from './colours';
 
 interface Props {
   item: SinceItem;
   pinned: boolean;
-  onMarkDone: (item: SinceItem) => void;
-  onEdit: (item: SinceItem) => void;
   onPress: (item: SinceItem) => void;
   onTogglePin: (item: SinceItem) => void;
 }
 
-export default function ItemCard({ item, pinned, onMarkDone, onEdit, onPress, onTogglePin }: Props) {
+export default function ItemCard({ item, pinned, onPress, onTogglePin }: Props) {
   const status = computeItemStatus(item);
-  const { label, daysSince } = status;
-  const secondary = secondaryLine(status);
-  const accent = statusColour(label);
+  const accent = statusColour(status.label);
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => onPress(item)}
+      activeOpacity={0.75}
+    >
       <View style={[styles.accentBar, { backgroundColor: accent }]} />
-
-      <TouchableOpacity
-        style={styles.content}
-        onPress={() => onPress(item)}
-        activeOpacity={0.7}>
-
+      <View style={styles.content}>
         <View style={styles.topRow}>
-          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.category} numberOfLines={1}>
+            {item.category.toUpperCase()}
+          </Text>
           <TouchableOpacity
             onPress={() => onTogglePin(item)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
-            accessibilityRole="button"
           >
-            <Text style={[styles.pinIcon, pinned && styles.pinIconActive]}>
+            <Text style={[styles.pin, pinned && styles.pinActive]}>
               {pinned ? '★' : '☆'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => onEdit(item)}
-            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-            accessibilityLabel={`Edit ${item.name}`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.editLink}>Edit</Text>
-          </TouchableOpacity>
         </View>
-
-        <Text style={styles.sinceText}>
-          {daysSince === 0 ? 'Done today' : `Last done ${humaniseDaysSince(daysSince)}`}
-        </Text>
-
-        <View style={styles.bottomRow}>
-          <View style={styles.statusInfo}>
-            {label !== null ? (
-              <>
-                <View style={[styles.statusDot, { backgroundColor: accent }]} />
-                <Text style={[styles.statusLabel, { color: accent }]}>{label}</Text>
-                {secondary !== '' && (
-                  <Text style={styles.secondaryText}> · {secondary}</Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.secondaryText}>No repeat set</Text>
-            )}
+        <View style={styles.mainRow}>
+          <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+          <View style={styles.rightCol}>
+            <Text style={styles.daysNum}>{status.daysSince}</Text>
+            <Text style={styles.daysSinceLabel}>DAYS{'\n'}SINCE</Text>
           </View>
-
-          <TouchableOpacity
-            style={styles.doneBtn}
-            onPress={() => onMarkDone(item)}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityLabel={`Mark ${item.name} as done`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.doneBtnText}>Done</Text>
-          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -98,10 +57,10 @@ const styles = StyleSheet.create({
     backgroundColor: colours.surface,
     flexDirection: 'row',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   accentBar: {
     width: 4,
@@ -111,77 +70,60 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 5,
-    gap: 10,
+  },
+  category: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colours.textMuted,
+    letterSpacing: 0.9,
+    flex: 1,
+  },
+  pin: {
+    fontSize: 14,
+    color: colours.textMuted,
+    lineHeight: 16,
+  },
+  pinActive: {
+    color: colours.amber,
+  },
+  mainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: colours.textPrimary,
     flex: 1,
+    marginRight: 12,
+    letterSpacing: -0.3,
+    lineHeight: 22,
   },
-  pinIcon: {
-    fontSize: 16,
-    color: colours.textMuted,
-    lineHeight: 20,
+  rightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  pinIconActive: {
-    color: '#C8842A',
+  daysNum: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: colours.textPrimary,
+    letterSpacing: -1,
+    lineHeight: 32,
+    textAlign: 'right',
   },
-  editLink: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colours.textMuted,
-    letterSpacing: 0.1,
-  },
-  sinceText: {
-    fontSize: 13,
-    color: colours.textSecondary,
-    marginBottom: 10,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  statusLabel: {
-    fontSize: 12,
+  daysSinceLabel: {
+    fontSize: 9,
     fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  secondaryText: {
-    fontSize: 12,
     color: colours.textMuted,
-  },
-  doneBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F0F0EE',
-    borderRadius: 6,
-    marginLeft: 10,
-  },
-  doneBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colours.textSecondary,
-    letterSpacing: 0.2,
+    letterSpacing: 0.7,
+    textAlign: 'right',
+    lineHeight: 12,
   },
 });

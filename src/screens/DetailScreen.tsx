@@ -14,8 +14,8 @@ import { RootStackParamList, CompletionEvent } from '../types';
 import { DerivedItem } from '../domain/items/types';
 import { getDerivedItemById, markItemDone } from '../domain/items/service';
 import { secondaryLine } from '../utils/statusUtils';
-import { humaniseDaysSince, parseDate, formatDisplay, getDaysSince } from '../utils/dateUtils';
-import { colours, statusColour } from '../components/colours';
+import { humaniseDaysSince, parseDate, formatDisplay, getDaysSince, intervalToDays } from '../utils/dateUtils';
+import { colours, statusColour, statusBgColour } from '../components/colours';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Detail'>;
 type Route = RouteProp<RootStackParamList, 'Detail'>;
@@ -30,23 +30,23 @@ function averageGapDays(history: CompletionEvent[]): number | null {
   return Math.round(total / (sorted.length - 1));
 }
 
-function formatAverage(days: number): string {
-  if (days < 14) return `avg. ${days}d`;
-  if (days < 60) return `avg. ${Math.round(days / 7)}w`;
-  if (days < 730) return `avg. ${Math.round(days / 30)}mo`;
-  return `avg. ${Math.round(days / 365)}y`;
+function formatGapShort(days: number): string {
+  if (days < 14) return `${days}d`;
+  if (days < 60) return `${Math.round(days / 7)}w`;
+  if (days < 730) return `${Math.round(days / 30)}mo`;
+  return `${Math.round(days / 365)}y`;
+}
+
+function formatGapLong(days: number): string {
+  if (days === 1) return '1 day since previous';
+  if (days < 14) return `${days} days since previous`;
+  if (days < 60) return `${Math.round(days / 7)} weeks since previous`;
+  if (days < 730) return `${Math.round(days / 30)} months since previous`;
+  return `${Math.round(days / 365)} years since previous`;
 }
 
 function gapBetween(olderDate: string, newerDate: string): number {
   return getDaysSince(olderDate) - getDaysSince(newerDate);
-}
-
-function formatGap(days: number): string {
-  if (days === 1) return '1 day later';
-  if (days < 14) return `${days} days later`;
-  if (days < 60) return `${Math.round(days / 7)} weeks later`;
-  if (days < 730) return `${Math.round(days / 30)} months later`;
-  return `${Math.round(days / 365)} years later`;
 }
 
 export default function DetailScreen() {
@@ -76,12 +76,22 @@ export default function DetailScreen() {
   const { status } = item;
   const { label, daysSince } = status;
   const accent = statusColour(label);
+  const badgeBg = statusBgColour(label);
   const secondary = secondaryLine(status);
   const alreadyDoneToday = daysSince === 0;
 
-  // history sorted newest-first (service guarantees this, but ensure it)
   const history = [...item.history].sort((a, b) => b.date.localeCompare(a.date));
   const avg = averageGapDays(history);
+
+  // Last gap: gap between most recent two completions
+  const lastGap = history.length >= 2
+    ? gapBetween(history[1].date, history[0].date)
+    : null;
+
+  // Repeat interval in days for ON TRACK / DELAYED calculation
+  const intervalDays = item.repeatValue && item.repeatUnit
+    ? intervalToDays(item.repeatValue, item.repeatUnit)
+    : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -95,6 +105,7 @@ export default function DetailScreen() {
         >
           <Text style={styles.navBack}>← Back</Text>
         </TouchableOpacity>
+        <Text style={styles.navTitle} numberOfLines={1}>{item.name}</Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('Edit', { itemId })}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -105,38 +116,27 @@ export default function DetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Item header */}
-        <View style={styles.headerBlock}>
-          <View style={[styles.accentPill, { backgroundColor: accent }]} />
-          <View style={styles.headerText}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            {item.category ? (
-              <Text style={styles.categoryLabel}>{item.category}</Text>
-            ) : null}
+        {/* Status badge */}
+        {label !== null && (
+          <View style={styles.badgeRow}>
+            <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+              <Text style={[styles.badgeText, { color: accent }]}>
+                {label.toUpperCase()}
+              </Text>
+            </View>
           </View>
+        )}
+
+        {/* Hero metric */}
+        <View style={styles.heroBlock}>
+          <Text style={styles.heroNumber}>{daysSince}</Text>
+          <Text style={styles.heroLabel}>days since</Text>
         </View>
 
-        {/* Status row */}
-        <View style={styles.statusRow}>
-          {label !== null ? (
-            <>
-              <View style={[styles.statusDot, { backgroundColor: accent }]} />
-              <Text style={[styles.statusLabel, { color: accent }]}>{label}</Text>
-              {secondary !== '' && (
-                <Text style={styles.statusSecondary}> · {secondary}</Text>
-              )}
-            </>
-          ) : (
-            <Text style={styles.statusSecondary}>No repeat interval set</Text>
-          )}
-        </View>
-
-        {/* Since text */}
-        <Text style={styles.sinceText}>
-          {alreadyDoneToday
-            ? 'You did this today'
-            : `Last done ${humaniseDaysSince(daysSince)}`}
-        </Text>
+        {/* Secondary (due info) */}
+        {secondary !== '' && secondary !== 'No repeat set' && (
+          <Text style={styles.heroSub}>{secondary}</Text>
+        )}
 
         {/* Mark done CTA */}
         <TouchableOpacity
@@ -150,53 +150,73 @@ export default function DetailScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* History section */}
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>History</Text>
-          {avg !== null && (
-            <Text style={styles.historyAvg}>{formatAverage(avg)}</Text>
-          )}
-        </View>
+        {/* Stats */}
+        {(avg !== null || lastGap !== null) && (
+          <>
+            <Text style={styles.sectionTitle}>STATS</Text>
+            <View style={styles.statsRow}>
+              {avg !== null && (
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>AVERAGE CADENCE</Text>
+                  <Text style={styles.statValue}>{formatGapShort(avg)}</Text>
+                </View>
+              )}
+              {lastGap !== null && (
+                <View style={[styles.statCard, avg !== null && { marginLeft: 10 }]}>
+                  <Text style={styles.statLabel}>LAST GAP</Text>
+                  <Text style={styles.statValue}>{formatGapShort(lastGap)}</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* History */}
+        <Text style={styles.sectionTitle}>HISTORY</Text>
 
         {history.length === 0 ? (
           <Text style={styles.emptyHistory}>
             No history yet. Tap "Mark as done today" to start tracking.
           </Text>
         ) : (
-          <View style={styles.timeline}>
+          <View style={styles.historyList}>
             {history.map((event, index) => {
               const daysSinceEvent = getDaysSince(event.date);
               const isToday = daysSinceEvent === 0;
-              const relativeText = isToday ? 'Today' : humaniseDaysSince(daysSinceEvent);
               const dateText = formatDisplay(parseDate(event.date));
+              const relativeText = isToday ? 'Today' : humaniseDaysSince(daysSinceEvent);
 
-              // Gap between this entry and the one before it (chronologically earlier = higher index)
               const nextEvent = history[index + 1];
               const gap = nextEvent ? gapBetween(nextEvent.date, event.date) : null;
 
+              let badge: 'on_track' | 'delayed' | null = null;
+              if (gap !== null && intervalDays !== null) {
+                badge = gap <= intervalDays * 1.1 ? 'on_track' : 'delayed';
+              }
+
               return (
-                <View key={event.id}>
-                  {/* Event row */}
-                  <View style={styles.eventRow}>
-                    <View style={styles.eventDotCol}>
-                      <View style={[styles.eventDot, index === 0 && { backgroundColor: accent }]} />
-                    </View>
-                    <View style={styles.eventText}>
-                      <Text style={[styles.eventDate, index === 0 && { color: colours.textPrimary, fontWeight: '600' }]}>
+                <View key={event.id} style={styles.historyCard}>
+                  <View style={styles.historyCardTop}>
+                    <View style={styles.historyDot} />
+                    <View style={styles.historyCardContent}>
+                      <Text style={[styles.historyDate, index === 0 && styles.historyDateRecent]}>
                         {dateText}
                       </Text>
-                      <Text style={styles.eventRelative}>{relativeText}</Text>
+                      <Text style={styles.historyRelative}>{relativeText}</Text>
                     </View>
-                  </View>
-
-                  {/* Gap connector */}
-                  {gap !== null && (
-                    <View style={styles.gapRow}>
-                      <View style={styles.gapLineCol}>
-                        <View style={styles.gapLine} />
+                    {badge === 'on_track' && (
+                      <View style={styles.onTrackBadge}>
+                        <Text style={styles.onTrackText}>ON TRACK</Text>
                       </View>
-                      <Text style={styles.gapText}>{formatGap(gap)}</Text>
-                    </View>
+                    )}
+                    {badge === 'delayed' && (
+                      <View style={styles.delayedBadge}>
+                        <Text style={styles.delayedText}>DELAYED</Text>
+                      </View>
+                    )}
+                  </View>
+                  {gap !== null && (
+                    <Text style={styles.gapText}>{formatGapLong(gap)}</Text>
                   )}
                 </View>
               );
@@ -209,16 +229,12 @@ export default function DetailScreen() {
   );
 }
 
-const DOT_SIZE = 10;
-const DOT_COL_WIDTH = 28;
-
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colours.background,
   },
 
-  // Nav bar
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -230,73 +246,69 @@ const styles = StyleSheet.create({
   navBack: {
     fontSize: 15,
     color: colours.textSecondary,
+    minWidth: 60,
+  },
+  navTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colours.textPrimary,
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
   navEdit: {
     fontSize: 15,
     color: colours.textSecondary,
     fontWeight: '500',
+    minWidth: 60,
+    textAlign: 'right',
   },
 
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 48,
   },
 
-  // Header block
-  headerBlock: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+  // Status badge
+  badgeRow: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  accentPill: {
-    width: 4,
-    height: 36,
-    borderRadius: 2,
-    marginRight: 14,
-    marginTop: 4,
+  badge: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  headerText: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 30,
+  badgeText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: colours.textPrimary,
-    letterSpacing: -0.5,
-    lineHeight: 36,
-  },
-  categoryLabel: {
-    fontSize: 13,
-    color: colours.textMuted,
-    marginTop: 2,
+    letterSpacing: 0.8,
   },
 
-  // Status
-  statusRow: {
-    flexDirection: 'row',
+  // Hero
+  heroBlock: {
     alignItems: 'center',
     marginBottom: 6,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  heroNumber: {
+    fontSize: 72,
+    fontWeight: '700',
+    color: colours.textPrimary,
+    letterSpacing: -3,
+    lineHeight: 80,
   },
-  statusLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+  heroLabel: {
+    fontSize: 16,
+    color: colours.textSecondary,
+    fontWeight: '400',
+    marginTop: 2,
   },
-  statusSecondary: {
+  heroSub: {
     fontSize: 13,
     color: colours.textMuted,
-  },
-  sinceText: {
-    fontSize: 14,
-    color: colours.textSecondary,
-    marginBottom: 28,
+    textAlign: 'center',
+    marginBottom: 4,
   },
 
   // Done button
@@ -305,7 +317,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 36,
+    marginTop: 24,
+    marginBottom: 32,
   },
   doneBtnDisabled: {
     backgroundColor: colours.border,
@@ -320,81 +333,120 @@ const styles = StyleSheet.create({
     color: colours.textMuted,
   },
 
-  // History header
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  // Section titles
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colours.textMuted,
+    letterSpacing: 0.9,
+    marginBottom: 12,
+    marginTop: 4,
   },
-  historyTitle: {
-    fontSize: 11,
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    marginBottom: 28,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colours.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colours.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  statLabel: {
+    fontSize: 9,
     fontWeight: '600',
     color: colours.textMuted,
     letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    marginBottom: 6,
   },
-  historyAvg: {
-    fontSize: 12,
-    color: colours.textMuted,
-    fontWeight: '500',
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colours.textPrimary,
+    letterSpacing: -1,
   },
+
+  // History
   emptyHistory: {
     fontSize: 14,
     color: colours.textMuted,
     lineHeight: 20,
   },
-
-  // Timeline
-  timeline: {},
-  eventRow: {
+  historyList: {
+    gap: 8,
+  },
+  historyCard: {
+    backgroundColor: colours.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colours.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  historyCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  eventDotCol: {
-    width: DOT_COL_WIDTH,
-    alignItems: 'center',
+  historyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colours.amber,
+    marginRight: 10,
+    flexShrink: 0,
   },
-  eventDot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    backgroundColor: colours.border,
-  },
-  eventText: {
+  historyCardContent: {
     flex: 1,
-    paddingVertical: 2,
   },
-  eventDate: {
+  historyDate: {
     fontSize: 15,
     color: colours.textSecondary,
+    fontWeight: '500',
   },
-  eventRelative: {
+  historyDateRecent: {
+    color: colours.textPrimary,
+    fontWeight: '600',
+  },
+  historyRelative: {
     fontSize: 12,
     color: colours.textMuted,
     marginTop: 1,
   },
-
-  // Gap connector
-  gapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 32,
+  onTrackBadge: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  gapLineCol: {
-    width: DOT_COL_WIDTH,
-    alignItems: 'center',
-    alignSelf: 'stretch',
+  onTrackText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colours.amber,
+    letterSpacing: 0.5,
   },
-  gapLine: {
-    flex: 1,
-    width: 1,
-    backgroundColor: colours.border,
+  delayedBadge: {
+    borderWidth: 1,
+    borderColor: colours.destructive,
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  delayedText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colours.destructive,
+    letterSpacing: 0.5,
   },
   gapText: {
     fontSize: 11,
     color: colours.textMuted,
+    marginTop: 6,
+    marginLeft: 18,
     fontStyle: 'italic',
-    letterSpacing: 0.1,
   },
 });
