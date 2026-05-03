@@ -31,8 +31,7 @@
           }
         }
       ],
-      "expo-notifications",
-      "./plugins/withKotlinVersion"
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
