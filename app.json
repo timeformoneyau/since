@@ -23,7 +23,16 @@
       ]
     },
     "plugins": [
-      "expo-notifications"
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": false
+          }
+        }
+      ],
+      "expo-notifications",
+      "./plugins/withKotlinVersion"
     ],
     "extra": {
       "eas": {

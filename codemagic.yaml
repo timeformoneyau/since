@@ -11,6 +11,9 @@ workflows:
       - name: Expo prebuild
         script: npx expo prebuild --platform android --clean
       - name: Build APK
-        script: cd android && ./gradlew assembleRelease
+        script: |
+          set -e
+          cd android
+          ./gradlew assembleRelease
     artifacts:
       - android/app/build/outputs/apk/release/app-release.apk
