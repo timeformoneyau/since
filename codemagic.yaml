@@ -10,10 +10,12 @@ workflows:
         script: npm install
       - name: Expo prebuild
         script: npx expo prebuild --platform android --clean
+      - name: Show generated build.gradle
+        script: grep -E "kotlin|compileSdk|buildTools|minSdk|targetSdk" android/build.gradle || true
       - name: Build APK
         script: |
           set -e
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --stacktrace
     artifacts:
       - android/app/build/outputs/apk/release/app-release.apk
