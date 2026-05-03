@@ -1,3 +1,7 @@
+// NOTE: The `notes` column requires a one-time Supabase migration:
+//   ALTER TABLE items ADD COLUMN notes text;
+// Run this in your Supabase project → SQL Editor before using the Notes feature.
+
 import { supabase } from '../../lib/supabase';
 import { SinceItem, CompletionEvent, RepeatUnit } from '../../types';
 
@@ -10,6 +14,7 @@ interface ItemRow {
   history: unknown;
   repeat_value: number | null;
   repeat_unit: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +31,7 @@ function rowToItem(row: ItemRow): SinceItem {
     history,
     repeatValue: row.repeat_value,
     repeatUnit: row.repeat_unit as RepeatUnit | null,
+    notes: row.notes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -37,7 +43,7 @@ async function currentUserId(): Promise<string> {
   return user.id;
 }
 
-function itemToRow(item: SinceItem, userId: string): Omit<ItemRow, 'user_id'> & { user_id: string } {
+function itemToRow(item: SinceItem, userId: string): Omit<ItemRow, never> {
   return {
     id: item.id,
     user_id: userId,
@@ -47,6 +53,7 @@ function itemToRow(item: SinceItem, userId: string): Omit<ItemRow, 'user_id'> & 
     history: item.history,
     repeat_value: item.repeatValue,
     repeat_unit: item.repeatUnit,
+    notes: item.notes ?? null,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
   };

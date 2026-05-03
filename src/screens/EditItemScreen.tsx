@@ -34,6 +34,7 @@ export default function EditItemScreen() {
   const [lastDoneDate, setLastDoneDate] = useState(todayString());
   const [repeatValue, setRepeatValue] = useState('');
   const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>('months');
+  const [notes, setNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,7 @@ export default function EditItemScreen() {
       setLastDoneDate(derived.lastDoneDate);
       setRepeatValue(derived.repeatValue ? String(derived.repeatValue) : '');
       setRepeatUnit(derived.repeatUnit ?? 'months');
+      setNotes(derived.notes ?? '');
       setLoading(false);
     })();
   }, [itemId]);
@@ -64,6 +66,7 @@ export default function EditItemScreen() {
       lastDoneDate,
       repeatValue: hasRepeat ? rv : null,
       repeatUnit: hasRepeat ? repeatUnit : null,
+      notes: notes.trim() || null,
     });
 
     navigation.goBack();
@@ -174,6 +177,21 @@ export default function EditItemScreen() {
           </View>
         </View>
 
+        {/* Notes */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Notes</Text>
+          <TextInput
+            style={[styles.textInput, styles.notesInput]}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Add a note…"
+            placeholderTextColor={colours.textMuted}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
         {/* Save */}
         <TouchableOpacity
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
@@ -275,6 +293,10 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.35 },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  notesInput: {
+    minHeight: 90,
+    paddingTop: 12,
+  },
   deleteBtn: {
     paddingVertical: 14,
     alignItems: 'center',

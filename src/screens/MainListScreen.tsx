@@ -15,7 +15,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SinceItem, RootStackParamList, TabParamList } from '../types';
 import { DerivedItem } from '../domain/items/types';
-import { getDerivedItems } from '../domain/items/service';
+import { getDerivedItems, getLocalDerivedItems } from '../domain/items/service';
 import { getUser } from '../domain/auth/service';
 import { loadPinnedIds, togglePin } from '../domain/items/pins';
 import { statusSortOrder } from '../utils/statusUtils';
@@ -23,7 +23,7 @@ import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
 type Nav = CompositeNavigationProp<
-  BottomTabNavigationProp<TabParamList, 'Habits'>,
+  BottomTabNavigationProp<TabParamList, 'Since'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
@@ -85,15 +85,12 @@ function buildSections(
 ): ListSection[] {
   const pinnedItems = sortPinned(items.filter((i) => pinnedIds.has(i.id)));
   const rest = applySort(items.filter((i) => !pinnedIds.has(i.id)), sortMode);
-
   const sections: ListSection[] = [];
-
   if (pinnedItems.length > 0) {
     sections.push({ title: 'Pinned', data: pinnedItems });
   }
-
   if (groupMode === 'all') {
-    if (rest.length > 0) sections.push({ title: 'Active Habits', data: rest });
+    if (rest.length > 0) sections.push({ title: 'Since List', data: rest });
   } else if (groupMode === 'grouped') {
     const cats = [...new Set(rest.map((i) => i.category))].sort();
     for (const cat of cats) {
@@ -104,33 +101,35 @@ function buildSections(
     const catItems = rest.filter((i) => i.category === groupMode);
     if (catItems.length > 0) sections.push({ title: groupMode, data: catItems });
   }
-
   return sections;
 }
 
 export default function MainListScreen() {
   const navigation = useNavigation<Nav>();
   const [items, setItems] = useState<DerivedItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [userInitial, setUserInitial] = useState('');
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<SortMode>('status');
   const [groupMode, setGroupMode] = useState<GroupMode>('all');
 
   useEffect(() => {
+    // Load from local cache immediately to avoid blank screen
+    getLocalDerivedItems().then((cached) => {
+      setItems(cached);
+      setLoaded(true);
+    });
     getUser().then((u) => {
       if (u?.email) setUserInitial(u.email[0].toUpperCase());
     });
     loadPinnedIds().then(setPinnedIds);
   }, []);
 
-  const refresh = useCallback(async () => {
-    setItems(await getDerivedItems());
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh]),
+      // Sync from cloud in the background; updates items when complete
+      getDerivedItems().then(setItems);
+    }, []),
   );
 
   function handlePress(item: SinceItem) {
@@ -151,6 +150,11 @@ export default function MainListScreen() {
     () => buildSections(items, pinnedIds, sortMode, groupMode),
     [items, pinnedIds, sortMode, groupMode],
   );
+
+  // Show background while initial cache loads (prevents flash of empty state)
+  if (!loaded) {
+    return <SafeAreaView style={styles.safe} />;
+  }
 
   if (items.length === 0) {
     return (
@@ -202,7 +206,7 @@ export default function MainListScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Since</Text>
+        <Text style={styles.headerTitle}>Since List</Text>
         <TouchableOpacity
           style={styles.avatarBtn}
           onPress={() => navigation.navigate('Account')}
@@ -295,8 +299,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colours.background,
   },
-
-  // Empty state
   emptyContainer: {
     flex: 1,
     paddingHorizontal: 32,
@@ -329,11 +331,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 40,
   },
-  primaryCTAText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  primaryCTAText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   quickStartLabel: {
     fontSize: 12,
     fontWeight: '500',
@@ -342,11 +340,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 12,
   },
-  quickStartRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  quickStartRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1,
     borderColor: colours.border,
@@ -355,12 +349,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: colours.surface,
   },
-  chipText: {
-    fontSize: 13,
-    color: colours.textSecondary,
-  },
+  chipText: { fontSize: 13, color: colours.textSecondary },
 
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -370,7 +360,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
     color: colours.textPrimary,
     letterSpacing: -0.5,
@@ -383,22 +373,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  avatarBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
-  // Sort pills
-  sortRow: {
-    flexGrow: 0,
-    marginBottom: 2,
-  },
-  sortRowContent: {
-    paddingHorizontal: 16,
-    gap: 6,
-    flexDirection: 'row',
-  },
+  sortRow: { flexGrow: 0, marginBottom: 2 },
+  sortRowContent: { paddingHorizontal: 16, gap: 6, flexDirection: 'row' },
   sortPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -407,44 +385,15 @@ const styles = StyleSheet.create({
     borderColor: colours.border,
     backgroundColor: colours.surface,
   },
-  sortPillActive: {
-    backgroundColor: colours.textPrimary,
-    borderColor: colours.textPrimary,
-  },
-  sortPillText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colours.textSecondary,
-  },
-  sortPillTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  sortPillActive: { backgroundColor: colours.textPrimary, borderColor: colours.textPrimary },
+  sortPillText: { fontSize: 13, fontWeight: '500', color: colours.textSecondary },
+  sortPillTextActive: { color: '#fff', fontWeight: '600' },
 
-  // Category tabs
-  catRow: {
-    flexGrow: 0,
-    marginBottom: 8,
-    marginTop: 6,
-  },
-  catRowContent: {
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    gap: 20,
-  },
-  catTab: {
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  catTabText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colours.textMuted,
-    letterSpacing: 0.7,
-  },
-  catTabTextActive: {
-    color: colours.textPrimary,
-  },
+  catRow: { flexGrow: 0, marginBottom: 8, marginTop: 6 },
+  catRowContent: { paddingHorizontal: 16, flexDirection: 'row', gap: 20 },
+  catTab: { paddingVertical: 4, alignItems: 'center' },
+  catTabText: { fontSize: 11, fontWeight: '600', color: colours.textMuted, letterSpacing: 0.7 },
+  catTabTextActive: { color: colours.textPrimary },
   catTabUnderline: {
     height: 2,
     backgroundColor: colours.textPrimary,
@@ -453,12 +402,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
 
-  // Section headers
-  sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 6,
-  },
+  sectionHeader: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
   sectionHeaderText: {
     fontSize: 10,
     fontWeight: '700',
@@ -466,12 +410,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.9,
   },
 
-  list: {
-    paddingTop: 2,
-    paddingBottom: 100,
-  },
+  list: { paddingTop: 2, paddingBottom: 100 },
 
-  // FAB
   fab: {
     position: 'absolute',
     right: 20,
@@ -488,11 +428,5 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  fabText: {
-    color: '#fff',
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '300',
-    marginTop: -2,
-  },
+  fabText: { color: '#fff', fontSize: 30, lineHeight: 34, fontWeight: '300', marginTop: -2 },
 });

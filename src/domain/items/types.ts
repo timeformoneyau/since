@@ -6,6 +6,7 @@ export interface CreateItemInput {
   lastDoneDate: string;
   repeatValue: number | null;
   repeatUnit: RepeatUnit | null;
+  notes?: string | null;
 }
 
 export interface UpdateItemInput {
@@ -14,9 +15,9 @@ export interface UpdateItemInput {
   lastDoneDate?: string;
   repeatValue?: number | null;
   repeatUnit?: RepeatUnit | null;
+  notes?: string | null;
 }
 
-/** A SinceItem with all computed fields attached. Single source of truth for derived state. */
 export interface DerivedItem extends SinceItem {
   status: ItemStatus;
 }

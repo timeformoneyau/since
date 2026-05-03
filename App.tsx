@@ -68,7 +68,7 @@ function TabNavigator() {
       }}
     >
       <Tab.Screen
-        name="Habits"
+        name="Since"
         component={MainListScreen}
         options={{
           tabBarIcon: ({ color, size }) => (

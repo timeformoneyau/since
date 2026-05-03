@@ -1,7 +1,7 @@
 import { StatusLabel } from '../types';
 
 export const colours = {
-  background: '#FAFAF8',
+  background: '#F2EFE8',   // warm beige
   surface: '#FFFFFF',
   border: '#EBEBEA',
   textPrimary: '#111110',
