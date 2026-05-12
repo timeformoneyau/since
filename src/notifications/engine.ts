@@ -125,10 +125,7 @@ async function commitNotifications(pending: PendingNotification[]): Promise<void
       await Notifications.scheduleNotificationAsync({
         identifier: n.identifier,
         content: { title: 'Since', body: n.body },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: n.triggerDate,
-        },
+        trigger: n.triggerDate,
       });
     } catch {
       // Scheduling is non-critical. Silently skip on permission or platform errors.

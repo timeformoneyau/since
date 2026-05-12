@@ -25,7 +25,7 @@ function isRawItem(x: unknown): x is Record<string, unknown> {
  * always satisfy the current SinceItem shape.
  */
 function hydrate(raw: Record<string, unknown>): SinceItem {
-  const item = raw as SinceItem;
+  const item = raw as unknown as SinceItem;
 
   // history was added after v0 — seed from lastDoneDate so users see at least one entry
   if (!Array.isArray(item.history)) {
