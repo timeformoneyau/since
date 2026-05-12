@@ -23,11 +23,13 @@
         "backgroundColor": "#F2EFE8"
       },
       "package": "com.since.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "plugins": [
@@ -39,7 +41,14 @@
           }
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Since needs access to your photos to attach evidence to events.",
+          "cameraPermission": "Since needs camera access to photograph receipts and documents."
+        }
+      ]
     ],
     "extra": {
       "eas": {

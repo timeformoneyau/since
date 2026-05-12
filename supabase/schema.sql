@@ -36,3 +36,25 @@ as $$
 $$;
 
 grant execute on function public.delete_user() to authenticated;
+
+-- Notes column (run if not already added)
+alter table public.items add column if not exists notes text;
+
+-- ─── Supabase Storage — event-photos bucket ──────────────────────────────────
+-- Run in SQL Editor OR create via Dashboard → Storage → New bucket
+--
+-- 1. Create private bucket:
+--    insert into storage.buckets (id, name, public) values ('event-photos', 'event-photos', false);
+--
+-- 2. RLS: users can only access their own photos (path starts with their user ID)
+create policy "users_own_photos_insert"
+  on storage.objects for insert
+  with check (bucket_id = 'event-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "users_own_photos_select"
+  on storage.objects for select
+  using (bucket_id = 'event-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "users_own_photos_delete"
+  on storage.objects for delete
+  using (bucket_id = 'event-photos' and auth.uid()::text = (storage.foldername(name))[1]);

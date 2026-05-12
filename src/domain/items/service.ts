@@ -1,4 +1,4 @@
-import { SinceItem, CompletionEvent } from '../../types';
+import { SinceItem, CompletionEvent, EventPhoto, ExtractedReceiptData } from '../../types';
 import { CreateItemInput, UpdateItemInput, DerivedItem } from './types';
 import { loadItems, saveItems } from './storage';
 import { deriveItem } from './derive';
@@ -14,6 +14,8 @@ import {
   scheduleItemNotifications,
   rescheduleAllNotifications,
 } from '../../notifications/scheduler';
+import { uploadEventPhoto } from '../events/upload';
+import { processEventEvidence } from '../events/enrichment';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -76,14 +78,9 @@ export async function createItem(input: CreateItemInput): Promise<DerivedItem> {
     updatedAt: now,
   };
 
-  // Save locally first, then sync to cloud
   const existing = await loadItems();
   await saveItems([...existing, item]);
-  try {
-    await cloudUpsertItem(item);
-  } catch {
-    // Cloud sync failed; data is safe locally
-  }
+  try { await cloudUpsertItem(item); } catch {}
 
   await scheduleItemNotifications(item);
   return deriveItem(item);
@@ -103,13 +100,8 @@ export async function updateItem(itemId: string, updates: UpdateItemInput): Prom
     updatedAt: new Date().toISOString(),
   };
 
-  // Save locally first, then sync to cloud
   await saveItems(items.map((i) => (i.id === itemId ? updated : i)));
-  try {
-    await cloudUpsertItem(updated);
-  } catch {
-    // Cloud sync failed; data is safe locally
-  }
+  try { await cloudUpsertItem(updated); } catch {}
 
   await scheduleItemNotifications(updated);
   return deriveItem(updated);
@@ -130,11 +122,66 @@ export async function markItemDone(itemId: string, doneDate?: string): Promise<D
   };
 
   await saveItems(items.map((i) => (i.id === itemId ? updated : i)));
-  try {
-    await cloudUpsertItem(updated);
-  } catch {
-    // Cloud sync failed; data is safe locally
+  try { await cloudUpsertItem(updated); } catch {}
+
+  await scheduleItemNotifications(updated);
+  return deriveItem(updated);
+}
+
+export interface LogEventInput {
+  date: string;
+  notes?: string | null;
+  photoUri?: string | null;
+}
+
+export async function logEvent(itemId: string, input: LogEventInput): Promise<DerivedItem> {
+  const items = await loadItems();
+  const existing = items.find((i) => i.id === itemId);
+  if (!existing) throw new Error(`Item not found: ${itemId}`);
+
+  const eventId = generateId();
+  let photos: EventPhoto[] = [];
+  let extractedData: ExtractedReceiptData | null = null;
+  let hederaTxId: string | null = null;
+
+  if (input.photoUri) {
+    const storagePath = await uploadEventPhoto(input.photoUri, itemId, eventId);
+    photos = [{ id: generateId(), storagePath, uploadedAt: new Date().toISOString() }];
+
+    try {
+      const result = await processEventEvidence({
+        itemId,
+        eventId,
+        storagePath,
+        eventDate: input.date,
+        itemName: existing.name,
+        category: existing.category,
+      });
+      extractedData = result.extractedData;
+      hederaTxId = result.hederaTxId;
+    } catch {
+      // Enrichment failed — event still saves with the photo
+    }
   }
+
+  const event: CompletionEvent = {
+    id: eventId,
+    date: input.date,
+    notes: input.notes ?? null,
+    photos,
+    extractedData,
+    hederaTxId,
+  };
+
+  const updated: SinceItem = {
+    ...existing,
+    lastDoneDate: input.date,
+    history: [event, ...existing.history],
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveItems(items.map((i) => (i.id === itemId ? updated : i)));
+  try { await cloudUpsertItem(updated); } catch {}
 
   await scheduleItemNotifications(updated);
   return deriveItem(updated);
@@ -144,10 +191,6 @@ export async function deleteItem(itemId: string): Promise<void> {
   const items = await loadItems();
   const remaining = items.filter((i) => i.id !== itemId);
   await saveItems(remaining);
-  try {
-    await cloudDeleteItem(itemId);
-  } catch {
-    // Cloud sync failed; deleted locally
-  }
+  try { await cloudDeleteItem(itemId); } catch {}
   await rescheduleAllNotifications(remaining);
 }

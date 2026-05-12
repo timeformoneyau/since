@@ -1,8 +1,26 @@
 export type RepeatUnit = 'days' | 'weeks' | 'months' | 'years';
 
+export interface EventPhoto {
+  id: string;
+  storagePath: string; // e.g. userId/itemId/eventId.jpg
+  uploadedAt: string;
+}
+
+export interface ExtractedReceiptData {
+  vendor?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  receiptDate?: string | null;
+  description?: string | null;
+}
+
 export interface CompletionEvent {
   id: string;
   date: string; // YYYY-MM-DD
+  notes?: string | null;
+  photos?: EventPhoto[];
+  extractedData?: ExtractedReceiptData | null;
+  hederaTxId?: string | null;
 }
 
 export interface SinceItem {
@@ -55,6 +73,8 @@ export type RootStackParamList = {
   Add: undefined;
   Edit: { itemId: string };
   Detail: { itemId: string };
+  LogEvent: { itemId: string };
+  EventDetail: { itemId: string; eventId: string };
   ChangePassword: undefined;
 };
 
