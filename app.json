@@ -6,20 +6,30 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#ffffff"
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F2EFE8"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.since.app"
     },
     "android": {
+      "icon": "./assets/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F2EFE8"
+      },
       "package": "com.since.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "plugins": [
@@ -31,7 +41,14 @@
           }
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Since needs access to your photos to attach evidence to events.",
+          "cameraPermission": "Since needs camera access to photograph receipts and documents."
+        }
+      ]
     ],
     "extra": {
       "eas": {

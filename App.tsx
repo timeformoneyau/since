@@ -20,6 +20,8 @@ import MainListScreen from './src/screens/MainListScreen';
 import AddItemScreen from './src/screens/AddItemScreen';
 import EditItemScreen from './src/screens/EditItemScreen';
 import DetailScreen from './src/screens/DetailScreen';
+import LogEventScreen from './src/screens/LogEventScreen';
+import EventDetailScreen from './src/screens/EventDetailScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 
@@ -127,6 +129,12 @@ function AppNavigator() {
         }}
       />
       <AppStack.Screen name="Detail" component={DetailScreen} />
+      <AppStack.Screen
+        name="LogEvent"
+        component={LogEventScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <AppStack.Screen name="EventDetail" component={EventDetailScreen} />
       <AppStack.Screen
         name="ChangePassword"
         component={ChangePasswordScreen}
