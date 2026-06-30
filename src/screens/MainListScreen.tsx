@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -10,25 +10,47 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SinceItem, RootStackParamList } from '../types';
+import { SinceItem, RootStackParamList, DEFAULT_CATEGORIES } from '../types';
 import { DerivedItem } from '../domain/items/types';
 import { getDerivedItems, markItemDone } from '../domain/items/service';
 import { getUser } from '../domain/auth/service';
+import { sortItems, computeItemStatus, statusSortOrder } from '../utils/statusUtils';
 import ItemCard from '../components/ItemCard';
 import { colours } from '../components/colours';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
+type Section = { title: string; data: DerivedItem[] };
 
-const QUICK_START = [
-  { name: 'Dentist', category: 'Health' },
-  { name: 'Tyre rotation', category: 'Auto' },
-  { name: 'Air filter', category: 'Household' },
-  { name: 'Smoke alarm', category: 'Household' },
-];
+function buildSections(items: DerivedItem[]): Section[] {
+  const map = new Map<string, DerivedItem[]>();
+  for (const item of items) {
+    const cat = item.category || 'Other';
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat)!.push(item);
+  }
+
+  const sections: Array<Section & { urgency: number; catOrder: number }> = [];
+  for (const [title, data] of map.entries()) {
+    const sorted = sortItems(data) as DerivedItem[];
+    const urgency = statusSortOrder(computeItemStatus(sorted[0]).label);
+    const catOrder = (DEFAULT_CATEGORIES as readonly string[]).indexOf(title);
+    sections.push({
+      title,
+      data: sorted,
+      urgency,
+      catOrder: catOrder === -1 ? DEFAULT_CATEGORIES.length : catOrder,
+    });
+  }
+
+  // Most urgent section first; DEFAULT_CATEGORIES order as tiebreaker
+  sections.sort((a, b) => a.urgency - b.urgency || a.catOrder - b.catOrder);
+
+  return sections.map(({ title, data }) => ({ title, data }));
+}
 
 export default function MainListScreen() {
   const navigation = useNavigation<Nav>();
-  const [items, setItems] = useState<DerivedItem[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [userInitial, setUserInitial] = useState('');
 
   useEffect(() => {
@@ -38,7 +60,8 @@ export default function MainListScreen() {
   }, []);
 
   const refresh = useCallback(async () => {
-    setItems(await getDerivedItems());
+    const items = await getDerivedItems();
+    setSections(buildSections(items));
   }, []);
 
   useFocusEffect(
@@ -60,7 +83,9 @@ export default function MainListScreen() {
     navigation.navigate('Detail', { itemId: item.id });
   }
 
-  if (items.length === 0) {
+  const isEmpty = sections.length === 0;
+
+  if (isEmpty) {
     return (
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="dark-content" backgroundColor={colours.background} />
@@ -78,18 +103,30 @@ export default function MainListScreen() {
             <Text style={styles.primaryCTAText}>Add something</Text>
           </TouchableOpacity>
 
-          <Text style={styles.quickStartLabel}>Quick start</Text>
-          <View style={styles.quickStartRow}>
-            {QUICK_START.map((q) => (
-              <TouchableOpacity
-                key={q.name}
-                style={styles.chip}
-                onPress={() => navigation.navigate('Add')}
-              >
-                <Text style={styles.chipText}>{q.name}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.exampleLabel}>Here's the idea</Text>
+          <View style={styles.exampleCards}>
+            <View style={styles.exampleCard}>
+              <View style={[styles.exampleAccent, { backgroundColor: colours.comingUp }]} />
+              <View style={styles.exampleBody}>
+                <Text style={styles.exampleName}>Milk</Text>
+                <Text style={styles.exampleMeta}>Coming up · expires tomorrow</Text>
+              </View>
+            </View>
+            <View style={styles.exampleCard}>
+              <View style={[styles.exampleAccent, { backgroundColor: colours.gettingOverdue }]} />
+              <View style={styles.exampleBody}>
+                <Text style={styles.exampleName}>Car service</Text>
+                <Text style={styles.exampleMeta}>Getting overdue · 6 weeks ago</Text>
+              </View>
+            </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.scanCTA}
+            onPress={() => navigation.navigate('ScanFood')}
+          >
+            <Text style={styles.scanCTAText}>📷  Scan food</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -111,6 +148,13 @@ export default function MainListScreen() {
             <Text style={styles.avatarBtnText}>{userInitial || '?'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={styles.cameraBtn}
+            onPress={() => navigation.navigate('ScanFood')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.cameraBtnText}>📷</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('Add')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -120,8 +164,8 @@ export default function MainListScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={items}
+      <SectionList<DerivedItem>
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ItemCard
@@ -131,8 +175,14 @@ export default function MainListScreen() {
             onPress={handlePress}
           />
         )}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+          </View>
+        )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
   );
@@ -175,37 +225,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     borderRadius: 10,
     alignSelf: 'flex-start',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   primaryCTAText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
-  quickStartLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+  exampleLabel: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colours.textMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 12,
   },
-  quickStartRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  exampleCards: {
     gap: 8,
+    marginBottom: 24,
   },
-  chip: {
+  exampleCard: {
+    flexDirection: 'row',
+    backgroundColor: colours.surface,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colours.border,
-    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  exampleAccent: {
+    width: 4,
+  },
+  exampleBody: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 12,
+  },
+  exampleName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colours.textPrimary,
+    marginBottom: 2,
+  },
+  exampleMeta: {
+    fontSize: 12,
+    color: colours.textSecondary,
+  },
+  scanCTA: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colours.border,
+    alignSelf: 'flex-start',
     backgroundColor: colours.surface,
   },
-  chipText: {
-    fontSize: 13,
+  scanCTAText: {
+    fontSize: 14,
     color: colours.textSecondary,
+    fontWeight: '500',
   },
 
   // List header
@@ -241,6 +317,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colours.textSecondary,
   },
+  cameraBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colours.surface,
+    borderWidth: 1,
+    borderColor: colours.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraBtnText: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
   addBtn: {
     width: 36,
     height: 36,
@@ -256,8 +346,20 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
 
+  // Section list
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 6,
+  },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colours.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   list: {
-    paddingTop: 8,
     paddingBottom: 32,
   },
 });

@@ -33,6 +33,7 @@ export interface ItemStatus {
 }
 
 export const DEFAULT_CATEGORIES = [
+  'Kitchen',
   'Household',
   'Health',
   'Auto',
@@ -46,6 +47,7 @@ export const DEFAULT_CATEGORIES = [
 export type RootStackParamList = {
   Main: undefined;
   Add: undefined;
+  ScanFood: undefined;
   Edit: { itemId: string };
   Detail: { itemId: string };
   Account: undefined;
