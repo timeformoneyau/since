@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { RootStackParamList } from '../types';
 import { createItem } from '../domain/items/service';
 import { todayString, formatDisplay, parseDate, formatStorage } from '../utils/dateUtils';
@@ -35,6 +36,8 @@ function daysUntil(expiryStr: string): number {
 
 export default function ScanFoodScreen() {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const nameRef = useRef<TextInput>(null);
 
   const defaultExpiry = formatStorage(addDays(parseDate(todayString()), 7));
@@ -69,11 +72,12 @@ export default function ScanFoodScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colours.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: 60 + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.screenLabel}>Food item</Text>
