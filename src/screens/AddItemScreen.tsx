@@ -99,6 +99,7 @@ export default function AddItemScreen() {
           <TextInput
             ref={nameRef}
             style={styles.nameInput}
+            testID="add-name-input"
             placeholder="What have you done?"
             placeholderTextColor={colours.textMuted}
             value={name}
@@ -147,6 +148,7 @@ export default function AddItemScreen() {
           <Text style={styles.label}>Repeat every (optional)</Text>
           <TextInput
             style={styles.repeatInput}
+            testID="add-repeat-input"
             placeholder="No repeat"
             placeholderTextColor={colours.textMuted}
             value={repeatValue}
@@ -158,6 +160,7 @@ export default function AddItemScreen() {
             {REPEAT_UNITS.map((u) => (
               <TouchableOpacity
                 key={u}
+                testID={`add-unit-${u}`}
                 style={[styles.unitBtn, hasRepeatValue && repeatUnit === u && styles.unitBtnActive]}
                 onPress={() => setRepeatUnit(u)}
               >
@@ -174,11 +177,16 @@ export default function AddItemScreen() {
         <TouchableOpacity
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={handleSave}
+          testID="add-save-button"
+          // Stays tappable so it can explain why it can't save. Explicit
+          // disabled={false} is needed: TouchableOpacity otherwise treats
+          // accessibilityState.disabled as disabled and swallows the tap.
+          disabled={false}
           accessibilityState={{ disabled: !canSave }}
         >
           <Text style={styles.saveBtnText}>Track this</Text>
         </TouchableOpacity>
-        {showNameHint && !canSave && <Text style={styles.saveHint}>Add a name to save</Text>}
+        {showNameHint && !canSave && <Text style={styles.saveHint} testID="add-save-hint">Add a name to save</Text>}
       </ScrollView>
 
       {showDatePicker && (

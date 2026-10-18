@@ -115,6 +115,7 @@ export default function MainListScreen() {
 
           <TouchableOpacity
             style={styles.primaryCTA}
+            testID="empty-add-button"
             onPress={() => navigation.navigate('Add')}
           >
             <Text style={styles.primaryCTAText}>Add something</Text>
@@ -159,6 +160,8 @@ export default function MainListScreen() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.avatarBtn}
+            testID="main-account-button"
+            accessibilityLabel="Account"
             onPress={() => navigation.navigate('Account')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -166,6 +169,8 @@ export default function MainListScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.cameraBtn}
+            testID="main-scan-button"
+            accessibilityLabel="Scan food"
             onPress={() => navigation.navigate('ScanFood')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -173,6 +178,8 @@ export default function MainListScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addBtn}
+            testID="main-add-button"
+            accessibilityLabel="Add something"
             onPress={() => navigation.navigate('Add')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

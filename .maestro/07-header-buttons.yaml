@@ -1,0 +1,25 @@
+appId: com.since.app
+name: Main list header buttons are tappable (not under the status bar)
+# Maestro can't measure positions, so this checks the effect instead: if the
+# header sat under the status bar, Android would take these taps and the
+# screens wouldn't open. The screenshot is kept for a visual check.
+---
+- runFlow: subflows/launch.yaml
+- runFlow:
+    file: subflows/add-first-item.yaml
+    env:
+      NAME: Milk
+- takeScreenshot: 07-header
+- tapOn:
+    id: "main-add-button"
+- assertVisible:
+    id: "add-name-input"
+- back
+- back
+- extendedWaitUntil:
+    visible:
+      id: "main-account-button"
+    timeout: 10000
+- tapOn:
+    id: "main-account-button"
+- assertVisible: "Sign out"

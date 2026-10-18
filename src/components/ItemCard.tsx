@@ -24,7 +24,7 @@ export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
   const accent = statusColour(label);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID={`item-${item.name}`}>
       {/* Status accent bar — left edge, colour-coded */}
       <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
@@ -37,6 +37,7 @@ export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
           <TouchableOpacity
             onPress={() => onEdit(item)}
+            testID={`item-${item.name}-edit`}
             hitSlop={{ top: 10, bottom: 10, left: 16, right: 8 }}
             accessibilityLabel={`Edit ${item.name}`}
             accessibilityRole="button"
@@ -69,6 +70,7 @@ export default function ItemCard({ item, onMarkDone, onEdit, onPress }: Props) {
           <TouchableOpacity
             style={styles.doneBtn}
             onPress={() => onMarkDone(item)}
+            testID={`item-${item.name}-done`}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityLabel={`Mark ${item.name} as done`}
             accessibilityRole="button"

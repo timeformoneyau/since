@@ -1,0 +1,23 @@
+appId: com.since.app
+name: Delete an item, then Undo
+---
+- runFlow: subflows/launch.yaml
+- runFlow:
+    file: subflows/add-first-item.yaml
+    env:
+      NAME: Passport
+- tapOn:
+    id: "item-Passport-edit"
+- scrollUntilVisible:
+    element:
+      id: "edit-delete-button"
+- tapOn:
+    id: "edit-delete-button"
+- assertVisible: "Passport deleted"
+- takeScreenshot: 06-delete-toast
+- tapOn:
+    id: "toast-action"
+- extendedWaitUntil:
+    visible:
+      id: "item-Passport"
+    timeout: 10000
