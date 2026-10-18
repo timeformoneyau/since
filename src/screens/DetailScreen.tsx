@@ -140,12 +140,14 @@ export default function DetailScreen() {
       <View style={styles.navBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
+          testID="detail-back-button"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.navBack}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => navigation.navigate('Edit', { itemId })}
+          testID="detail-edit-button"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.navEdit}>Edit</Text>
@@ -191,6 +193,7 @@ export default function DetailScreen() {
         <TouchableOpacity
           style={[styles.doneBtn, alreadyDoneToday && styles.doneBtnDisabled]}
           onPress={handleMarkDone}
+          testID="detail-mark-done-button"
           disabled={alreadyDoneToday}
           activeOpacity={0.8}
         >
@@ -239,6 +242,7 @@ export default function DetailScreen() {
                     {index === 0 && canUndoDone(item) && (
                       <TouchableOpacity
                         onPress={handleUndoLatest}
+                        testID="detail-undo-latest"
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         accessibilityRole="button"
                         accessibilityLabel="Undo the latest entry"

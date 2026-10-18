@@ -53,12 +53,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <View
             key={toast.key}
             style={[styles.toast, { bottom: 16 + insets.bottom }]}
+            testID="toast"
             accessibilityLiveRegion="polite"
           >
             <Text style={styles.message} numberOfLines={2}>{toast.message}</Text>
             {toast.actionLabel && toast.onAction && (
               <TouchableOpacity
                 onPress={handleAction}
+                testID="toast-action"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityRole="button"
               >

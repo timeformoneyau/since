@@ -116,6 +116,7 @@ export default function EditItemScreen() {
           <Text style={styles.label}>Name</Text>
           <TextInput
             style={styles.textInput}
+            testID="edit-name-input"
             value={name}
             onChangeText={setName}
             autoCapitalize="sentences"
@@ -153,6 +154,7 @@ export default function EditItemScreen() {
           <View style={styles.repeatRow}>
             <TextInput
               style={styles.repeatInput}
+              testID="edit-repeat-input"
               placeholder="No repeat"
               placeholderTextColor={colours.textMuted}
               value={repeatValue}
@@ -164,6 +166,7 @@ export default function EditItemScreen() {
               {REPEAT_UNITS.map((u) => (
                 <TouchableOpacity
                   key={u}
+                  testID={`edit-unit-${u}`}
                   style={[
                     styles.unitBtn,
                     hasRepeatValue && repeatUnit === u && styles.unitBtnActive,
@@ -189,14 +192,19 @@ export default function EditItemScreen() {
         <TouchableOpacity
           style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={handleSave}
+          testID="edit-save-button"
+          // Stays tappable so it can explain why it can't save. Explicit
+          // disabled={false} is needed: TouchableOpacity otherwise treats
+          // accessibilityState.disabled as disabled and swallows the tap.
+          disabled={false}
           accessibilityState={{ disabled: !canSave }}
         >
           <Text style={styles.saveBtnText}>Save changes</Text>
         </TouchableOpacity>
-        {showNameHint && !canSave && <Text style={styles.saveHint}>Add a name to save</Text>}
+        {showNameHint && !canSave && <Text style={styles.saveHint} testID="edit-save-hint">Add a name to save</Text>}
 
         {/* Delete */}
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} testID="edit-delete-button">
           <Text style={styles.deleteBtnText}>Delete this item</Text>
         </TouchableOpacity>
       </ScrollView>

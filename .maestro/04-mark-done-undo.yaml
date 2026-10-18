@@ -1,0 +1,24 @@
+appId: com.since.app
+name: Mark done, then Undo
+---
+- runFlow: subflows/launch.yaml
+- runFlow:
+    file: subflows/add-first-item.yaml
+    env:
+      NAME: Car service
+- tapOn:
+    id: "item-Car service-done"
+- assertVisible: "Car service marked as done"
+- takeScreenshot: 04-mark-done-toast
+- tapOn:
+    id: "toast-action"
+- assertNotVisible:
+    id: "toast"
+# After Undo only the "added" entry remains, so History offers no Undo
+- tapOn: "Car service"
+- extendedWaitUntil:
+    visible:
+      id: "detail-mark-done-button"
+    timeout: 10000
+- assertNotVisible:
+    id: "detail-undo-latest"
