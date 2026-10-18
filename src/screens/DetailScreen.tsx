@@ -12,10 +12,17 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, CompletionEvent } from '../types';
 import { DerivedItem } from '../domain/items/types';
-import { getDerivedItemById, markItemDone } from '../domain/items/service';
+import {
+  getDerivedItemById,
+  markItemDone,
+  undoMarkDone,
+  restoreItem,
+  canUndoDone,
+} from '../domain/items/service';
 import { secondaryLine } from '../utils/statusUtils';
 import { humaniseDaysSince, parseDate, formatDisplay, getDaysSince } from '../utils/dateUtils';
 import { colours, statusColour } from '../components/colours';
+import { useToast } from '../components/Toast';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Detail'>;
 type Route = RouteProp<RootStackParamList, 'Detail'>;
@@ -55,6 +62,7 @@ export default function DetailScreen() {
   const { itemId } = route.params;
 
   const [item, setItem] = useState<DerivedItem | null>(null);
+  const showToast = useToast();
 
   const load = useCallback(async () => {
     const derived = await getDerivedItemById(itemId);
@@ -67,8 +75,49 @@ export default function DetailScreen() {
   );
 
   async function handleMarkDone() {
-    await markItemDone(itemId);
+    if (!item) return;
+    const previousLastDoneDate = item.lastDoneDate;
+    const updated = await markItemDone(itemId);
     await load();
+    showToast({
+      message: 'Marked as done',
+      actionLabel: 'Undo',
+      onAction: async () => {
+        try {
+          await undoMarkDone(itemId, updated.history[0].id, previousLastDoneDate);
+          await load();
+        } catch {
+          showToast({ message: "Couldn't undo. Check your connection and try again." });
+        }
+      },
+    });
+  }
+
+  /** Undo the latest completion later on, from the History list. */
+  async function handleUndoLatest() {
+    if (!item || !canUndoDone(item)) return;
+    const { status: _status, ...snapshot } = item; // keep derived fields out of storage
+    // Use the newest entry by date, matching what the History list shows first
+    const latest = [...item.history].sort((a, b) => b.date.localeCompare(a.date))[0];
+    try {
+      await undoMarkDone(itemId, latest.id);
+      await load();
+    } catch {
+      showToast({ message: "Couldn't undo. Check your connection and try again." });
+      return;
+    }
+    showToast({
+      message: 'Removed the latest entry',
+      actionLabel: 'Undo',
+      onAction: async () => {
+        try {
+          await restoreItem(snapshot);
+          await load();
+        } catch {
+          showToast({ message: "Couldn't undo. Check your connection and try again." });
+        }
+      },
+    });
   }
 
   if (!item) return null;
@@ -187,6 +236,16 @@ export default function DetailScreen() {
                       </Text>
                       <Text style={styles.eventRelative}>{relativeText}</Text>
                     </View>
+                    {index === 0 && canUndoDone(item) && (
+                      <TouchableOpacity
+                        onPress={handleUndoLatest}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Undo the latest entry"
+                      >
+                        <Text style={styles.eventUndo}>Undo</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Gap connector */}
@@ -373,6 +432,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colours.textMuted,
     marginTop: 1,
+  },
+  eventUndo: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colours.textMuted,
   },
 
   // Gap connector

@@ -29,6 +29,22 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+type ItemsListener = () => void;
+const listeners = new Set<ItemsListener>();
+
+/**
+ * Subscribe to item changes made through this service (e.g. an undo from a toast
+ * while the list is already on screen). Returns an unsubscribe function.
+ */
+export function onItemsChanged(listener: ItemsListener): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+function notifyItemsChanged(): void {
+  listeners.forEach((l) => l());
+}
+
 /**
  * On first sign-in, upload any locally-stored items to the cloud.
  * Uses upsert so it's safe to call multiple times.
@@ -143,13 +159,78 @@ export async function markItemDone(itemId: string, doneDate?: string): Promise<D
   return deriveItem(updated);
 }
 
+/** True when the latest completion can be undone (the first entry, from creation, always stays). */
+export function canUndoDone(item: SinceItem): boolean {
+  return item.history.length > 1;
+}
+
+/**
+ * Remove a completion event recorded by markItemDone.
+ *
+ * lastDoneDate goes back to `previousLastDoneDate` when given (the value captured
+ * just before marking done), otherwise to the newest remaining history entry.
+ * The creation entry is never removed, so history is never left empty.
+ */
+export async function undoMarkDone(
+  itemId: string,
+  eventId: string,
+  previousLastDoneDate?: string,
+): Promise<DerivedItem> {
+  const items = await loadItems();
+  const existing = items.find((i) => i.id === itemId);
+  if (!existing) throw new Error(`Item not found: ${itemId}`);
+
+  const index = existing.history.findIndex((e) => e.id === eventId);
+  if (index === -1 || existing.history.length <= 1) return deriveItem(existing);
+
+  const history = existing.history.filter((e) => e.id !== eventId);
+  // Only the newest entry drives lastDoneDate; removing an older one leaves it alone
+  const lastDoneDate =
+    index === 0 ? previousLastDoneDate ?? history[0].date : existing.lastDoneDate;
+
+  const updated: SinceItem = {
+    ...existing,
+    lastDoneDate,
+    history,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await cloudUpsertItem(updated);
+  await saveItems(items.map((i) => (i.id === itemId ? updated : i)));
+  await scheduleItemNotifications(updated);
+  notifyItemsChanged();
+  return deriveItem(updated);
+}
+
 /**
  * Delete an item and recompute notifications for the remaining set.
+ * Returns the deleted item so it can be put back with restoreItem.
  */
-export async function deleteItem(itemId: string): Promise<void> {
+export async function deleteItem(itemId: string): Promise<SinceItem | null> {
   await cloudDeleteItem(itemId);
   const items = await loadItems();
+  const deleted = items.find((i) => i.id === itemId) ?? null;
   const remaining = items.filter((i) => i.id !== itemId);
   await saveItems(remaining);
   await rescheduleAllNotifications(remaining);
+  notifyItemsChanged();
+  return deleted;
+}
+
+/**
+ * Put back an item exactly as it was (same id, history and dates).
+ * Used to undo a delete, or to undo an undo-done.
+ */
+export async function restoreItem(item: SinceItem): Promise<DerivedItem> {
+  const restored: SinceItem = { ...item, updatedAt: new Date().toISOString() };
+
+  await cloudUpsertItem(restored);
+  const items = await loadItems();
+  const all = items.some((i) => i.id === item.id)
+    ? items.map((i) => (i.id === item.id ? restored : i))
+    : [...items, restored];
+  await saveItems(all);
+  await rescheduleAllNotifications(all);
+  notifyItemsChanged();
+  return deriveItem(restored);
 }

@@ -12,6 +12,7 @@ import { colours } from './src/components/colours';
 import { migrateLocalItemsToCloud } from './src/domain/items/service';
 import { requestNotificationPermissions, rescheduleAllNotifications } from './src/notifications/scheduler';
 import { loadItems } from './src/domain/items/storage';
+import { ToastProvider } from './src/components/Toast';
 
 // App screens
 import MainListScreen from './src/screens/MainListScreen';
@@ -111,9 +112,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        {session ? <AppNavigator /> : <AuthNavigator />}
-      </NavigationContainer>
+      <ToastProvider>
+        <NavigationContainer>
+          {session ? <AppNavigator /> : <AuthNavigator />}
+        </NavigationContainer>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }
