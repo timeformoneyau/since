@@ -7,11 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { RootStackParamList, RepeatUnit } from '../types';
 import { getDerivedItemById, updateItem, deleteItem } from '../domain/items/service';
 import { formatDisplay, parseDate, todayString } from '../utils/dateUtils';
@@ -26,6 +27,8 @@ const REPEAT_UNITS: RepeatUnit[] = ['days', 'weeks', 'months', 'years'];
 
 export default function EditItemScreen() {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const route = useRoute<Route>();
   const { itemId } = route.params;
 
@@ -94,11 +97,12 @@ export default function EditItemScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colours.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: 60 + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
       >
         {/* Name */}
