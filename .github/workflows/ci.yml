@@ -57,7 +57,13 @@ jobs:
       - run: npm install --no-audit --no-fund
 
       - name: Generate native Android project
-        run: npx expo prebuild --platform android --no-install
+        run: |
+          npx expo prebuild --platform android --no-install
+          # The generated build.gradle asks for the Kotlin Gradle plugin with no
+          # version, so RN 0.76's catalog picks 1.9.24, which can't compile the
+          # SDK 54 modules (Kotlin 2.1 metadata). Pin it to match ext.kotlinVersion.
+          sed -i "s/classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')/classpath('org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0')/" android/build.gradle
+          grep -q "kotlin-gradle-plugin:2.1.0" android/build.gradle
 
       - name: Build test APK (x86_64 only, for the emulator)
         working-directory: android
