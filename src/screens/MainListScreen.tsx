@@ -12,10 +12,11 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SinceItem, RootStackParamList, DEFAULT_CATEGORIES } from '../types';
 import { DerivedItem } from '../domain/items/types';
-import { getDerivedItems, markItemDone } from '../domain/items/service';
+import { getDerivedItems, markItemDone, undoMarkDone, onItemsChanged } from '../domain/items/service';
 import { getUser } from '../domain/auth/service';
 import { sortItems, computeItemStatus, statusSortOrder } from '../utils/statusUtils';
 import ItemCard from '../components/ItemCard';
+import { useToast } from '../components/Toast';
 import { colours } from '../components/colours';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
@@ -52,6 +53,7 @@ export default function MainListScreen() {
   const navigation = useNavigation<Nav>();
   const [sections, setSections] = useState<Section[]>([]);
   const [userInitial, setUserInitial] = useState('');
+  const showToast = useToast();
 
   useEffect(() => {
     getUser().then((u) => {
@@ -70,9 +72,24 @@ export default function MainListScreen() {
     }, [refresh]),
   );
 
+  // Picks up undo actions taken from a toast while this screen is showing
+  useEffect(() => onItemsChanged(refresh), [refresh]);
+
   async function handleMarkDone(item: SinceItem) {
-    await markItemDone(item.id);
+    const previousLastDoneDate = item.lastDoneDate;
+    const updated = await markItemDone(item.id);
     refresh();
+    showToast({
+      message: `${item.name} marked as done`,
+      actionLabel: 'Undo',
+      onAction: async () => {
+        try {
+          await undoMarkDone(item.id, updated.history[0].id, previousLastDoneDate);
+        } catch {
+          showToast({ message: "Couldn't undo. Check your connection and try again." });
+        }
+      },
+    });
   }
 
   function handleEdit(item: SinceItem) {

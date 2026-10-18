@@ -39,6 +39,7 @@ export const DEFAULT_CATEGORIES = [
   'Auto',
   'Family',
   'Admin',
+  'Finance',
   'Purchases',
   'Other',
 ] as const;
